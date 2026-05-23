@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "nrl-ptt"
+rootProject.name = "78ham-ardptt"
 include ':app'
