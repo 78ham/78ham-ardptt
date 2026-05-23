@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Login
@@ -42,6 +43,7 @@ private fun ActivityRow(entry: PttService.ActivityEntry) {
     val (icon, color) = when (entry.type) {
         PttService.ActivityType.TX -> Icons.Filled.Send to StatusOrange
         PttService.ActivityType.RX -> Icons.Filled.Mic to StatusGreen
+        PttService.ActivityType.MSG -> Icons.Filled.Email to StatusBlue
         PttService.ActivityType.JOIN -> Icons.Filled.Login to StatusBlue
         PttService.ActivityType.LEAVE -> Icons.Filled.Login to TextDim
         PttService.ActivityType.SYSTEM -> Icons.Filled.Login to TextSecondary
@@ -56,7 +58,7 @@ private fun ActivityRow(entry: PttService.ActivityEntry) {
     ) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
         Text(
-            text = "${entry.callsign}",
+            text = entry.callsign,
             style = PttTypography.ListItemBold,
             color = color,
             modifier = Modifier.weight(1f)

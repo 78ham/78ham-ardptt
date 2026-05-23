@@ -21,9 +21,10 @@ class AudioManager(private val context: Context, private val udp: UdpClient) {
 
     private val recorder = AudioRecorder(context)
     private val player = AudioPlayer(context)
-    private val codec = G711Codec()
+    private val g711 = G711Codec()
+    private val opus = OpusCodec()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var audioCodec = AudioCodec.G711
+    private var audioCodec = AudioCodec.OPUS  // default to OPUS
 
     private val _tx = MutableStateFlow(false)
     val isTransmitting: StateFlow<Boolean> = _tx.asStateFlow()
@@ -47,20 +48,25 @@ class AudioManager(private val context: Context, private val udp: UdpClient) {
             val samples = ShortArray(frame.size / 2)
             ByteBuffer.wrap(frame).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(samples)
             val encoded = when (audioCodec) {
-                AudioCodec.G711 -> codec.encode(samples)
-                AudioCodec.OPUS -> frame
+                AudioCodec.G711 -> g711.encode(samples)
+                AudioCodec.OPUS -> opus.encode(samples) ?: frame
             }
             udp.sendAudio(encoded, audioCodec == AudioCodec.OPUS)
         }
     }
 
-    fun setCodec(c: AudioCodec) { audioCodec = c }
+    fun setCodec(c: AudioCodec) {
+        audioCodec = c
+        if (c == AudioCodec.OPUS) opus.initEncoder()
+    }
+
     fun setVolume(v: Int) { player.setVolume(v / 100f) }
-    fun preparePlayer() { player.start() }
+    fun preparePlayer() { player.start(); opus.initDecoder() }
 
     fun startTx(): Boolean {
         if (_tx.value) return true
         player.pause()
+        if (audioCodec == AudioCodec.OPUS) opus.initEncoder()
         val ok = recorder.start()
         if (ok) _tx.value = true else player.resume()
         return ok
@@ -76,7 +82,6 @@ class AudioManager(private val context: Context, private val udp: UdpClient) {
         _rx.value = true
         lastAudioTime = System.currentTimeMillis()
 
-        // Calculate simple audio level
         var sum = 0L
         for (b in data) sum += (b.toInt() and 0xFF)
         _level.value = (sum.toFloat() / data.size / 255f).coerceIn(0f, 1f)
@@ -92,16 +97,23 @@ class AudioManager(private val context: Context, private val udp: UdpClient) {
         val pcm = when (type) {
             Nrl21Protocol.TYPE_VOICE -> {
                 val samples = ShortArray(data.size)
-                for (i in data.indices) samples[i] = codec.decode(data[i].toInt() and 0xFF).toShort()
-                ByteBuffer.allocate(samples.size * 2).order(ByteOrder.LITTLE_ENDIAN).apply { asShortBuffer().put(samples) }.array()
+                for (i in data.indices) samples[i] = g711.decode(data[i].toInt() and 0xFF).toShort()
+                ByteBuffer.allocate(samples.size * 2).order(ByteOrder.LITTLE_ENDIAN)
+                    .apply { asShortBuffer().put(samples) }.array()
             }
-            Nrl21Protocol.TYPE_OPUS -> data
+            Nrl21Protocol.TYPE_OPUS -> {
+                val decoded = opus.decode(data)
+                if (decoded != null) {
+                    ByteBuffer.allocate(decoded.size * 2).order(ByteOrder.LITTLE_ENDIAN)
+                        .apply { asShortBuffer().put(decoded) }.array()
+                } else data
+            }
             else -> return
         }
         player.feed(pcm)
     }
 
     fun release() {
-        rxJob?.cancel(); recorder.release(); player.release(); scope.cancel()
+        rxJob?.cancel(); recorder.release(); player.release(); opus.release(); scope.cancel()
     }
 }

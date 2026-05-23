@@ -13,13 +13,13 @@ class SettingsRepository(context: Context) {
     val settings: StateFlow<UserSettings> = _settings.asStateFlow()
 
     fun load(): UserSettings = UserSettings(
-        serverAddress = prefs.getString("server_address", "js.nrlptt.com") ?: "js.nrlptt.com",
+        serverAddress = prefs.getString("server_address", "m.nrlptt.com") ?: "m.nrlptt.com",
         serverPort = prefs.getInt("server_port", 60050),
         username = prefs.getString("username", "") ?: "",
         password = prefs.getString("password", "") ?: "",
         callsign = prefs.getString("callsign", "") ?: "",
-        dmrId = prefs.getInt("dmr_id", 0),
-        ssid = prefs.getInt("ssid", 78),
+        dmrId = prefs.getInt("dmr_id", 178),
+        ssid = prefs.getInt("ssid", 178),
         codec = if (prefs.getString("codec", "G711") == "OPUS") AudioCodec.OPUS else AudioCodec.G711,
         volume = prefs.getInt("volume", 100),
         screenOffPtt = prefs.getBoolean("screen_off_ptt", true),

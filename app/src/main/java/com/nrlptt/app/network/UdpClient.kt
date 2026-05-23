@@ -15,8 +15,8 @@ class UdpClient {
     companion object {
         private const val TAG = "UdpClient"
         private const val BUFFER = 2048
-        private const val HEARTBEAT_MS = 2000L
-        private const val TIMEOUT_MS = 30000L
+        private const val HEARTBEAT_MS = 1000L
+        private const val TIMEOUT_MS = 6000L
         private const val MAX_RECONNECT = 5
     }
 
@@ -34,8 +34,8 @@ class UdpClient {
     private var reconnects = 0
 
     var callsign: String = ""
-    var ssid: Int = 78
-    var dmrId: Int = 0
+    var ssid: Int = 178
+    var dmrId: Int = 178
     var devModel: Int = 101
 
     var onPacket: ((Nrl21Protocol.Packet) -> Unit)? = null

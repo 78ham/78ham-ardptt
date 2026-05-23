@@ -29,7 +29,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSkip: () -> Unit) {
     val scope = rememberCoroutineScope()
     val repo = remember { SettingsRepository(context) }
 
-    var server by remember { mutableStateOf("js.nrlptt.com") }
+    var server by remember { mutableStateOf("m.nrlptt.com") }
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }

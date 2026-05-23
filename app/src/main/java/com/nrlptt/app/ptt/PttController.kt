@@ -1,6 +1,8 @@
 package com.nrlptt.app.ptt
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.PowerManager
@@ -24,7 +26,7 @@ class PttController(private val context: Context) {
     }
 
     var listener: Listener? = null
-    var pttKeyCode: Int = KeyEvent.KEYCODE_VOLUME_UP
+    var pttKeyCode: Int = KEYCODE_PTT
     var screenOffPtt: Boolean = true
     var isPressed: Boolean = false
         private set
@@ -33,10 +35,37 @@ class PttController(private val context: Context) {
     private val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
     private var wakeLock: PowerManager.WakeLock? = null
     private var pressTime = 0L
+    private var deviceProfile: DeviceKeyProfiles.Profile? = null
 
     fun init(key: Int, screenOff: Boolean) {
         pttKeyCode = key; screenOffPtt = screenOff
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP, WAKE_TAG)
+
+        // Auto-detect device profile
+        deviceProfile = DeviceKeyProfiles.detect()
+        val profile = deviceProfile!!
+        if (key == KeyEvent.KEYCODE_VOLUME_UP) {
+            pttKeyCode = profile.pttKeyCode
+        }
+        Log.i(TAG, "Profile: ${profile.name}, PTT key: 0x${pttKeyCode.toString(16)}")
+
+        // Register broadcast receivers for MTK-style PTT
+        if (profile.useBroadcastPtt) {
+            profile.broadcastActions.forEach { action ->
+                try {
+                    val receiver = object : BroadcastReceiver() {
+                        override fun onReceive(ctx: Context, intent: Intent?) {
+                            when (intent?.action) {
+                                "android.intent.action.PTT.down" -> onKey(KeyEvent(KeyEvent.ACTION_DOWN, pttKeyCode))
+                                "android.intent.action.PTT.up" -> onKey(KeyEvent(KeyEvent.ACTION_UP, pttKeyCode))
+                            }
+                        }
+                    }
+                    context.registerReceiver(receiver, IntentFilter(action))
+                    Log.i(TAG, "Registered broadcast: $action")
+                } catch (e: Exception) { Log.e(TAG, "Broadcast register failed: $action", e) }
+            }
+        }
     }
 
     fun onKey(event: KeyEvent): Boolean {
@@ -45,10 +74,12 @@ class PttController(private val context: Context) {
             KeyEvent.ACTION_DOWN -> if (!isPressed) {
                 isPressed = true; pressTime = System.currentTimeMillis()
                 acquireWake(); vibrate(); listener?.onPress()
+                Log.d(TAG, "PTT press: 0x${event.keyCode.toString(16)}")
             }
             KeyEvent.ACTION_UP -> if (isPressed) {
                 if (System.currentTimeMillis() - pressTime >= 1000) listener?.onLongPress()
                 isPressed = false; listener?.onRelease(); releaseWake()
+                Log.d(TAG, "PTT release")
             }
         }
         return true
@@ -57,9 +88,16 @@ class PttController(private val context: Context) {
     fun press() { if (!isPressed) { isPressed = true; acquireWake(); listener?.onPress() } }
     fun release() { if (isPressed) { isPressed = false; listener?.onRelease(); releaseWake() } }
 
-    private fun isPttKey(k: Int) = k == pttKeyCode || k == KEYCODE_PTT || k == 113 ||
-            k == 368 || k == 270 || k == 531 || k == 532 || k == KeyEvent.KEYCODE_HEADSETHOOK ||
-            k in KeyEvent.KEYCODE_BUTTON_1..KeyEvent.KEYCODE_BUTTON_12
+    private fun isPttKey(k: Int): Boolean {
+        if (k == pttKeyCode) return true
+        if (k == KEYCODE_PTT) return true
+        // Device profile extra keys
+        deviceProfile?.extraKeyCodes?.let { if (k in it) return true }
+        // Generic PTT keys
+        return k == 113 || k == 368 || k == 270 || k == 531 || k == 532 ||
+                k == KeyEvent.KEYCODE_HEADSETHOOK ||
+                k in KeyEvent.KEYCODE_BUTTON_1..KeyEvent.KEYCODE_BUTTON_12
+    }
 
     private fun vibrate() {
         try {
