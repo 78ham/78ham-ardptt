@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_black">#FF000000</color>
+    <color name="bg_dark">#FF0A0A0A</color>
+    <color name="bg_card">#FF141414</color>
+    <color name="brand_green">#FF00FF88</color>
+    <color name="status_orange">#FFFF8800</color>
+    <color name="text_primary">#FFE0E0E0</color>
+    <color name="text_secondary">#FF888888</color>
+</resources>

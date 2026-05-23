@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.NrlPtt" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">@color/brand_green</item>
+        <item name="android:colorPrimaryDark">@color/bg_black</item>
+        <item name="android:colorAccent">@color/brand_green</item>
+        <item name="android:windowBackground">@color/bg_black</item>
+        <item name="android:statusBarColor">@color/bg_black</item>
+        <item name="android:navigationBarColor">@color/bg_black</item>
+    </style>
+</resources>
