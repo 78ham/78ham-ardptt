@@ -30,8 +30,8 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 100)
         }
 
-        val settings = SettingsRepository(this).load()
-        initialScreen = if (settings.autoConnect && settings.username.isNotEmpty()) AppScreen.MAIN else AppScreen.LOGIN
+        val servers = SettingsRepository(this).loadServers()
+        initialScreen = if (servers.any { it.autoConnect && it.username.isNotEmpty() }) AppScreen.MAIN else AppScreen.LOGIN
 
         startService(Intent(this, PttService::class.java))
 
@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
                             MainScreen(
                                 service = svc,
                                 onSettings = { screen = AppScreen.SETTINGS },
-                                onLogout = { svc.disconnect(); screen = AppScreen.LOGIN }
+                                onLogout = { svc.disconnectAll(); screen = AppScreen.LOGIN }
                             )
                         }
                     }

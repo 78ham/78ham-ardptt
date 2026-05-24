@@ -24,23 +24,28 @@ fun MainScreen(
     onSettings: () -> Unit,
     onLogout: () -> Unit
 ) {
-    val connState by service.connState.collectAsState()
-    val isLoggedIn by service.isLoggedIn.collectAsState()
-    val currentRoom by service.currentRoom.collectAsState()
-    val roomName by service.roomName.collectAsState()
-    val onlineCount by service.onlineCount.collectAsState()
-    val lastSpeaker by service.lastSpeaker.collectAsState()
-    val activityLog by service.activityLog.collectAsState()
+    val connections by service.connections.collectAsState()
+    val activeId by service.activeServerId.collectAsState()
     val isTransmitting by service.isTransmitting.collectAsState()
     val isReceiving by service.isReceiving.collectAsState()
-    val roomList by service.roomList.collectAsState()
-    val messages by service.messages.collectAsState()
+
+    val activeConn = connections[activeId]
+    val connState = activeConn?.connState?.collectAsState()?.value ?: ConnectionState.DISCONNECTED
+    val currentRoom = activeConn?.currentRoom?.collectAsState()?.value ?: 0
+    val roomName = activeConn?.roomName?.collectAsState()?.value ?: ""
+    val onlineCount = activeConn?.onlineCount?.collectAsState()?.value ?: 0
+    val roomList = activeConn?.roomList?.collectAsState()?.value ?: emptyList()
+
+    // Merge messages and activity from all connections
+    val allMessages = connections.values.flatMap { it.messages.value }.sortedByDescending { it.time }.take(5)
+    val allActivity = connections.values.flatMap { it.activityLog.value }.sortedByDescending { it.time }.take(5)
 
     var showRoomPicker by remember { mutableStateOf(false) }
     val isConnected = connState == ConnectionState.CONNECTED
 
-    LaunchedEffect(isLoggedIn) {
-        if (isLoggedIn) { kotlinx.coroutines.delay(500); service.loadRoomList() }
+    // Load rooms on login
+    LaunchedEffect(activeConn?.isLoggedIn?.value) {
+        if (activeConn?.isLoggedIn?.value == true) { kotlinx.coroutines.delay(500); activeConn.loadRoomList() }
     }
 
     val radioState = remember(isTransmitting, isReceiving, isConnected) {
@@ -54,6 +59,7 @@ fun MainScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(BgBlack)) {
         Column(modifier = Modifier.fillMaxSize()) {
+            // Top bar
             TopAppBar(
                 title = {},
                 actions = {
@@ -67,49 +73,59 @@ fun MainScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BgDark)
             )
 
-            RoomSwitcher(roomName = roomName, roomId = currentRoom, onlineCount = onlineCount,
-                onRoomClick = { showRoomPicker = true })
+            // Server switcher
+            ServerSwitcher(
+                connections = connections,
+                activeId = activeId,
+                onSelect = { service.setActiveServer(it) }
+            )
+
+            // Room switcher
+            RoomSwitcher(
+                roomName = roomName,
+                roomId = currentRoom,
+                onlineCount = onlineCount,
+                onRoomClick = { if (isConnected) showRoomPicker = true }
+            )
 
             Spacer(modifier = Modifier.height(3.dp))
             StatusCard(state = radioState, onlineCount = onlineCount, networkOk = isConnected)
             Spacer(modifier = Modifier.height(3.dp))
-            SpeakerIndicator(callsign = lastSpeaker, isReceiving = isReceiving, audioLevel = 0f)
-            Spacer(modifier = Modifier.height(3.dp))
 
-            // Combined message + activity list with stable keys
+            // Combined message + activity list
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth()
                     .clip(RoundedCornerShape(4.dp)).background(BgCard),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                items(messages.take(5), key = { "msg-${it.time}-${it.callsign}" }) { msg ->
+                items(allMessages, key = { "msg-${it.serverId}-${it.time}-${it.callsign}" }) { msg ->
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text("MSG", style = PttTypography.Caption, color = StatusBlue,
-                            modifier = Modifier.width(28.dp))
+                        Text(msg.serverId.substringBefore(":"), style = PttTypography.Caption,
+                            color = TextDim, modifier = Modifier.width(40.dp), maxLines = 1)
+                        Text("MSG", style = PttTypography.Caption, color = StatusBlue)
                         Text("${msg.callsign}-${msg.ssid}", style = PttTypography.ListItemBold, color = StatusBlue)
                         Text(msg.text, style = PttTypography.ListItem, color = TextPrimary,
                             modifier = Modifier.weight(1f), maxLines = 1)
                         Text(msg.time, style = PttTypography.Caption, color = TextDim)
                     }
                 }
-                items(activityLog.take(5), key = { "act-${it.time}-${it.type}" }) { entry ->
+                items(allActivity, key = { "act-${it.serverId}-${it.time}-${it.type}" }) { entry ->
                     val color = when (entry.type) {
-                        PttService.ActivityType.TX -> StatusOrange
-                        PttService.ActivityType.RX -> StatusGreen
-                        PttService.ActivityType.MSG -> StatusBlue
+                        "TX" -> StatusOrange; "RX" -> StatusGreen; "MSG" -> StatusBlue
                         else -> TextSecondary
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(entry.type.name, style = PttTypography.Caption, color = color,
-                            modifier = Modifier.width(28.dp))
+                        Text(entry.serverId.substringBefore(":"), style = PttTypography.Caption,
+                            color = TextDim, modifier = Modifier.width(40.dp), maxLines = 1)
+                        Text(entry.type, style = PttTypography.Caption, color = color)
                         Text(entry.callsign, style = PttTypography.ListItemBold, color = color,
                             modifier = Modifier.weight(1f))
                         Text(entry.time, style = PttTypography.Caption, color = TextDim)
@@ -117,8 +133,10 @@ fun MainScreen(
                 }
             }
 
+            // PTT button
+            val anyConnected = connections.values.any { it.connState.value == ConnectionState.CONNECTED }
             PttButton(
-                isConnected = isConnected, isTransmitting = isTransmitting,
+                isConnected = anyConnected, isTransmitting = isTransmitting,
                 onPress = { service.startTx() }, onRelease = { service.stopTx() },
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
             )
@@ -127,7 +145,7 @@ fun MainScreen(
         if (showRoomPicker) {
             RoomPickerDialog(rooms = roomList, currentRoomId = currentRoom,
                 onDismiss = { showRoomPicker = false },
-                onRoomSelected = { id -> service.joinRoom(id); showRoomPicker = false })
+                onRoomSelected = { id -> activeConn?.joinRoom(id); showRoomPicker = false })
         }
     }
 }

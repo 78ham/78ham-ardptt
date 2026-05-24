@@ -2,6 +2,7 @@ package com.nrlptt.app.ui.screen
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,6 +10,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,9 +21,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.nrlptt.app.data.AudioCodec
+import com.nrlptt.app.data.ServerConfig
 import com.nrlptt.app.data.SettingsRepository
 import com.nrlptt.app.data.UserSettings
+import com.nrlptt.app.network.ApiClient
 import com.nrlptt.app.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,22 +34,17 @@ fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { SettingsRepository(context) }
     val saved by repo.settings.collectAsState()
+    val servers by repo.servers.collectAsState()
+    val scope = rememberCoroutineScope()
 
-    var server by remember { mutableStateOf(saved.serverAddress) }
-    var port by remember { mutableStateOf(saved.serverPort.toString()) }
-    var user by remember { mutableStateOf(saved.username) }
-    var pass by remember { mutableStateOf(saved.password) }
-    var ssid by remember { mutableStateOf(saved.ssid.toString()) }
     var codec by remember { mutableStateOf(saved.codec) }
     var volume by remember { mutableStateOf(saved.volume) }
     var screenOff by remember { mutableStateOf(saved.screenOffPtt) }
-    var autoConn by remember { mutableStateOf(saved.autoConnect) }
+    var autoConn by remember { mutableStateOf(true) }
+    var showAddDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(saved) {
-        server = saved.serverAddress; port = saved.serverPort.toString()
-        user = saved.username; pass = saved.password; ssid = saved.ssid.toString()
         codec = saved.codec; volume = saved.volume; screenOff = saved.screenOffPtt
-        autoConn = saved.autoConnect
     }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
@@ -62,34 +63,39 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
 
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Section("SERVER") {
-                    OutlinedTextField(server, { server = it }, label = { Text("HOST") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors)
-                    OutlinedTextField(port, { port = it.filter { c -> c.isDigit() } }, label = { Text("PORT") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = fieldColors)
-                }
-
-                Section("ACCOUNT") {
-                    OutlinedTextField(user, { user = it }, label = { Text("USERNAME") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors)
-                    OutlinedTextField(pass, { pass = it }, label = { Text("PASSWORD") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(), colors = fieldColors)
-                }
-
-                Section("DEVICE") {
-                    if (saved.callsign.isNotEmpty()) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("CALLSIGN: ${saved.callsign}", style = PttTypography.ListItemBold, color = BrandGreen)
-                            Text("DMR: ${saved.dmrId}", style = PttTypography.ListItemBold, color = BrandGreen)
+                // Server list
+                Section("SERVERS") {
+                    servers.forEach { cfg ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(cfg.displayLabel, style = PttTypography.ListItemBold, color = TextPrimary)
+                                Text("${cfg.host}:${cfg.port}", style = PttTypography.Caption, color = TextSecondary)
+                            }
+                            if (cfg.username.isNotEmpty()) {
+                                Text(cfg.username, style = PttTypography.Caption, color = TextDim)
+                            }
+                            IconButton(onClick = { repo.removeServer(cfg.id) }, modifier = Modifier.size(20.dp)) {
+                                Icon(Icons.Filled.Delete, null, tint = StatusRed, modifier = Modifier.size(16.dp))
+                            }
                         }
+                        HorizontalDivider(color = Border, thickness = 0.5.dp)
                     }
-                    OutlinedTextField(ssid, { ssid = it.filter { c -> c.isDigit() } }, label = { Text("SSID") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = fieldColors)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { showAddDialog = true }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(Icons.Filled.Add, null, tint = BrandGreen, modifier = Modifier.size(16.dp))
+                        Text("ADD SERVER", style = PttTypography.ListItemBold, color = BrandGreen)
+                    }
                 }
 
+                // Audio
                 Section("AUDIO") {
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -108,6 +114,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         colors = SliderDefaults.colors(thumbColor = BrandGreen, activeTrackColor = BrandGreen))
                 }
 
+                // PTT
                 Section("PTT") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
@@ -115,23 +122,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                         Switch(screenOff, { screenOff = it },
                             colors = SwitchDefaults.colors(checkedTrackColor = BrandGreen))
                     }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Text("AUTO CONNECT", style = PttTypography.ListItem, color = TextPrimary)
-                        Switch(autoConn, { autoConn = it },
-                            colors = SwitchDefaults.colors(checkedTrackColor = BrandGreen))
-                    }
                 }
 
+                // Save
                 Button(
                     onClick = {
-                        repo.save(UserSettings(
-                            serverAddress = server, serverPort = port.toIntOrNull() ?: 60050,
-                            username = user, password = pass,
-                            callsign = saved.callsign, dmrId = saved.dmrId,
-                            ssid = ssid.toIntOrNull() ?: 178, codec = codec, volume = volume,
-                            screenOffPtt = screenOff, autoConnect = autoConn
-                        ))
+                        repo.save(UserSettings(codec = codec, volume = volume, screenOffPtt = screenOff))
                         Toast.makeText(context, "SAVED", Toast.LENGTH_SHORT).show(); onBack()
                     },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -142,7 +138,67 @@ fun SettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(24.dp))
             }
         }
+
+        // Add server dialog
+        if (showAddDialog) {
+            AddServerDialog(
+                onDismiss = { showAddDialog = false },
+                onAdd = { cfg -> repo.addServer(cfg); showAddDialog = false }
+            )
+        }
     }
+}
+
+@Composable
+private fun AddServerDialog(onDismiss: () -> Unit, onAdd: (ServerConfig) -> Unit) {
+    var host by remember { mutableStateOf("") }
+    var port by remember { mutableStateOf("60050") }
+    var user by remember { mutableStateOf("") }
+    var pass by remember { mutableStateOf("") }
+    var label by remember { mutableStateOf("") }
+    var autoConnect by remember { mutableStateOf(true) }
+
+    val fc = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = BrandGreen, unfocusedBorderColor = Border,
+        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, cursorColor = BrandGreen
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = BgCard,
+        title = { Text("ADD SERVER", style = PttTypography.StatusLabel, color = TextWhite) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(host, { host = it }, label = { Text("HOST") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fc)
+                OutlinedTextField(port, { port = it.filter { c -> c.isDigit() } }, label = { Text("PORT") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = fc)
+                OutlinedTextField(label, { label = it }, label = { Text("LABEL (optional)") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fc)
+                OutlinedTextField(user, { user = it }, label = { Text("USERNAME") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fc)
+                OutlinedTextField(pass, { pass = it }, label = { Text("PASSWORD") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(), colors = fc)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Checkbox(autoConnect, { autoConnect = it },
+                        colors = CheckboxDefaults.colors(checkedColor = BrandGreen))
+                    Text("AUTO CONNECT", style = PttTypography.ListItem, color = TextPrimary)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (host.isNotEmpty() && user.isNotEmpty()) {
+                    onAdd(ServerConfig(host, port.toIntOrNull() ?: 60050, user, pass, autoConnect, label))
+                }
+            }) { Text("ADD", color = BrandGreen) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("CANCEL", color = TextSecondary) }
+        }
+    )
 }
 
 @Composable
