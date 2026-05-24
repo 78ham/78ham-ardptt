@@ -14,8 +14,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.nrlptt.app.data.ServerConfig
 import com.nrlptt.app.data.SettingsRepository
 import com.nrlptt.app.theme.*
@@ -23,6 +21,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(onLoginSuccess: () -> Unit, onSkip: () -> Unit) {
+    val d = rememberScreenDimens()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = remember { SettingsRepository(context) }
@@ -35,15 +34,17 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSkip: () -> Unit) {
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
 
+    val gap = (d.componentGap.value * 2.5f).dp
+
     Box(modifier = Modifier.fillMaxSize().background(BgBlack)) {
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(d.cardPadding * 2),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(40.dp))
-            Text("NRL PTT", style = PttTypography.StatusValue, color = BrandGreen)
-            Text("PUBLIC NETWORK RADIO", style = PttTypography.StatLabel, color = TextSecondary)
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(d.cardPadding * 4))
+            Text("NRL PTT", fontSize = d.statusValueSize, fontWeight = FontWeight.Bold, color = BrandGreen, letterSpacing = androidx.compose.ui.unit.sp(1))
+            Text("PUBLIC NETWORK RADIO", fontSize = d.captionSize, color = TextSecondary, letterSpacing = androidx.compose.ui.unit.sp(1))
+            Spacer(Modifier.height(gap * 2))
 
             val fc = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = BrandGreen, unfocusedBorderColor = Border,
@@ -53,25 +54,25 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSkip: () -> Unit) {
 
             OutlinedTextField(server, { server = it }, label = { Text("SERVER") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fc)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(gap))
             OutlinedTextField(port, { port = it.filter { c -> c.isDigit() } }, label = { Text("PORT") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = fc)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(gap))
             OutlinedTextField(user, { user = it }, label = { Text("USERNAME") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fc)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(gap))
             OutlinedTextField(pass, { pass = it }, label = { Text("PASSWORD") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), colors = fc)
 
             if (error.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Text(error, color = StatusRed, fontSize = 12.sp)
+                Spacer(Modifier.height(gap))
+                Text(error, color = StatusRed, fontSize = d.listItemSize)
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(gap * 1.5f))
 
             Button(
                 onClick = {
@@ -79,30 +80,28 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSkip: () -> Unit) {
                     loading = true; error = ""
                     scope.launch {
                         repo.addServer(ServerConfig(server, port.toIntOrNull() ?: 60050, user, pass, true))
-                        loading = false
-                        onLoginSuccess()
+                        loading = false; onLoginSuccess()
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(48.dp),
+                modifier = Modifier.fillMaxWidth().height(d.pttHeight - 8.dp),
                 enabled = !loading && user.isNotEmpty() && pass.isNotEmpty(),
-                shape = RoundedCornerShape(4.dp),
+                shape = RoundedCornerShape(d.cornerRadius),
                 colors = ButtonDefaults.buttonColors(containerColor = BrandGreen, contentColor = BgBlack)
             ) {
-                if (loading) CircularProgressIndicator(Modifier.size(18.dp), color = BgBlack, strokeWidth = 2.dp)
-                else Text("LOGIN", style = PttTypography.ButtonLabel)
+                if (loading) CircularProgressIndicator(Modifier.size(d.iconSize - 2.dp), color = BgBlack, strokeWidth = 2.dp)
+                else Text("LOGIN", fontSize = d.buttonLabelSize, fontWeight = FontWeight.Bold, letterSpacing = androidx.compose.ui.unit.sp(2))
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(gap))
             TextButton(onClick = onSkip) {
-                Text("SKIP", color = TextDim, style = PttTypography.Caption)
+                Text("SKIP", fontSize = d.captionSize, color = TextDim)
             }
 
-            // Show existing servers
             if (servers.isNotEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                Text("SAVED SERVERS", style = PttTypography.StatLabel, color = TextSecondary)
+                Spacer(Modifier.height(gap * 1.5f))
+                Text("SAVED SERVERS", fontSize = d.captionSize, color = TextSecondary, letterSpacing = androidx.compose.ui.unit.sp(1))
                 servers.forEach { cfg ->
-                    Text("${cfg.displayLabel} (${cfg.host})", style = PttTypography.Caption, color = TextDim)
+                    Text("${cfg.displayLabel} (${cfg.host})", fontSize = d.captionSize, color = TextDim)
                 }
             }
         }

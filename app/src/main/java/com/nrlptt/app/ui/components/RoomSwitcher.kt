@@ -10,9 +10,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.nrlptt.app.theme.*
 
 @Composable
@@ -23,33 +22,26 @@ fun RoomSwitcher(
     onRoomClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val d = rememberScreenDimens()
     Row(
-        modifier = modifier
-            .fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
             .background(BgCard)
             .clickable { onRoomClick() }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = d.cardPadding, vertical = d.roomSwitcherPaddingV),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = roomName.ifEmpty { "SELECT CHANNEL" },
-                style = PttTypography.RoomName,
-                color = TextWhite,
-                maxLines = 1
+                fontSize = d.roomNameSize, fontWeight = FontWeight.Bold,
+                color = TextWhite, maxLines = 1
             )
             Text(
                 text = "ID:$roomId  ON:$onlineCount",
-                style = PttTypography.Caption,
-                color = TextSecondary
+                fontSize = d.captionSize, color = TextSecondary
             )
         }
-        Icon(
-            Icons.Filled.ArrowDropDown,
-            contentDescription = null,
-            tint = BrandGreen,
-            modifier = Modifier.size(28.dp)
-        )
+        Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = BrandGreen, modifier = Modifier.size(d.iconSize + 4.dp))
     }
 }

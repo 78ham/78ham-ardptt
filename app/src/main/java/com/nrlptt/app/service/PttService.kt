@@ -8,11 +8,9 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.nrlptt.app.R
 import com.nrlptt.app.audio.AudioManager
-import com.nrlptt.app.data.AudioCodec
 import com.nrlptt.app.data.ServerConfig
 import com.nrlptt.app.data.SettingsRepository
 import com.nrlptt.app.network.*
@@ -69,26 +67,6 @@ class PttService : Service() {
         // Wire audio TX to all connected UdpClients
         audio.getTxTargets = { _connections.value.values.filter { it.connState.value == ConnectionState.CONNECTED }.map { it.udp } }
 
-        // Wire audio RX from all connections
-        fun wireRx(conn: ServerConnection) {
-            conn.udp.onPacket = { pkt ->
-                scope.launch {
-                    when (pkt.type) {
-                        Nrl21Protocol.TYPE_VOICE, Nrl21Protocol.TYPE_OPUS -> {
-                            audio.handleRx(pkt.data, pkt.type, pkt.callSign)
-                            conn.addActivity("${pkt.callSign}-${pkt.ssid}", pkt.ssid, "RX")
-                        }
-                        Nrl21Protocol.TYPE_TEXT -> { /* handled in ServerConnection */ }
-                    }
-                }
-            }
-        }
-
-        // Observe new connections and wire RX
-        scope.launch {
-            _connections.collect { map -> map.values.forEach { wireRx(it) } }
-        }
-
         // Sync RX state
         scope.launch { audio.isReceiving.collect { _isReceiving.value = it } }
 
@@ -143,6 +121,17 @@ class PttService : Service() {
         if (existing != null && existing.isLoggedIn.value) return@withContext true
 
         val conn = ServerConnection(config, scope)
+        conn.addPacketListener { pkt ->
+            scope.launch {
+                when (pkt.type) {
+                    Nrl21Protocol.TYPE_VOICE, Nrl21Protocol.TYPE_OPUS -> {
+                        audio.handleRx(pkt.data, pkt.type, pkt.callSign)
+                        conn.addActivity("${pkt.callSign}-${pkt.ssid}", pkt.ssid, "RX")
+                    }
+                    Nrl21Protocol.TYPE_TEXT -> Unit
+                }
+            }
+        }
         _connections.value = _connections.value + (config.id to conn)
         if (_activeServerId.value.isEmpty()) _activeServerId.value = config.id
 

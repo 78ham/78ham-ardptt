@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
 import com.nrlptt.app.network.ConnectionState
 import com.nrlptt.app.network.ServerConnection
 import com.nrlptt.app.theme.*
@@ -21,18 +20,18 @@ fun ServerSwitcher(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val d = rememberScreenDimens()
     if (connections.isEmpty()) {
-        Text("NO SERVERS", style = PttTypography.Caption, color = TextDim,
-            modifier = modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+        Text("NO SERVERS", fontSize = d.captionSize, color = TextDim,
+            modifier = modifier.padding(horizontal = d.cardPadding, vertical = d.smallGap + 1.dp))
         return
     }
 
     Row(
-        modifier = modifier
-            .fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
             .background(BgDark)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(horizontal = d.smallGap + 2.dp, vertical = d.smallGap),
+        horizontalArrangement = Arrangement.spacedBy(d.smallGap)
     ) {
         connections.values.forEach { conn ->
             val isActive = conn.id == activeId
@@ -45,16 +44,14 @@ fun ServerSwitcher(
             val textColor = if (isActive) BrandGreen else TextSecondary
 
             Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(bg)
+                modifier = Modifier.clip(RoundedCornerShape(d.cornerRadius)).background(bg)
                     .clickable { onSelect(conn.id) }
-                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                    .padding(horizontal = d.serverTabPadding, vertical = d.smallGap + 1.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(d.smallGap)
             ) {
-                Box(Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(stateColor))
-                Text(conn.config.displayLabel, style = PttTypography.Caption, color = textColor, maxLines = 1)
+                Box(Modifier.size(d.dotSize * 0.6f).clip(RoundedCornerShape(d.dotSize * 0.3f)).background(stateColor))
+                Text(conn.config.displayLabel, fontSize = d.captionSize, color = textColor, maxLines = 1)
             }
         }
     }

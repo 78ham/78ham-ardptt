@@ -11,44 +11,44 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.nrlptt.app.network.ApiClient
+import androidx.compose.ui.text.font.FontWeight
+import com.nrlptt.app.network.RoomInfo
 import com.nrlptt.app.theme.*
 
 @Composable
 fun RoomPickerDialog(
-    rooms: List<ApiClient.RoomInfo>,
+    rooms: List<RoomInfo>,
     currentRoomId: Int,
     onDismiss: () -> Unit,
     onRoomSelected: (Int) -> Unit
 ) {
+    val d = rememberScreenDimens()
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = BgCard,
         titleContentColor = TextWhite,
-        title = { Text("SELECT CHANNEL", style = PttTypography.StatusLabel) },
+        title = { Text("SELECT CHANNEL", fontSize = d.statusLabelSize, fontWeight = FontWeight.Bold, letterSpacing = androidx.compose.ui.unit.sp(2)) },
         text = {
             LazyColumn {
                 itemsIndexed(rooms) { i, room ->
                     val sel = room.id == currentRoomId
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(4.dp))
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(d.cornerRadius))
                             .background(if (sel) BrandGreen.copy(alpha = 0.1f) else BgCardAlt)
                             .clickable { onRoomSelected(room.id) }
-                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                            .padding(horizontal = d.cardPadding, vertical = d.cardPadding),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(room.name, style = PttTypography.ListItemBold,
+                            Text(room.name, fontSize = d.listItemBoldSize,
+                                fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
                                 color = if (sel) BrandGreen else TextPrimary)
-                            Text("ID:${room.id}  N:${room.memberCount}", style = PttTypography.Caption,
-                                color = TextSecondary)
+                            Text("ID:${room.id}  N:${room.memberCount}", fontSize = d.captionSize, color = TextSecondary)
                         }
-                        if (sel) Text("●", color = BrandGreen, fontSize = 18.sp)
+                        if (sel) Text("●", color = BrandGreen, fontSize = d.statusLabelSize + androidx.compose.ui.unit.sp(2))
                     }
                     if (i < rooms.size - 1) HorizontalDivider(color = Border, thickness = 0.5.dp)
                 }
@@ -56,7 +56,7 @@ fun RoomPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("CLOSE", color = TextSecondary, style = PttTypography.Caption)
+                Text("CLOSE", fontSize = d.captionSize, color = TextSecondary)
             }
         }
     )

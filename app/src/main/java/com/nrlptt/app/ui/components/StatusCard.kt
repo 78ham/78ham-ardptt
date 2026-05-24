@@ -8,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
 import com.nrlptt.app.theme.*
 
 enum class RadioState { STANDBY, TRANSMITTING, RECEIVING, ERROR }
@@ -20,6 +19,7 @@ fun StatusCard(
     networkOk: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val d = rememberScreenDimens()
     val (label, color) = when (state) {
         RadioState.STANDBY -> "STANDBY" to StatusGray
         RadioState.TRANSMITTING -> "TX" to StatusOrange
@@ -28,36 +28,21 @@ fun StatusCard(
     }
 
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(4.dp))
+        modifier = modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(d.cornerRadius))
             .background(BgCard)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = d.cardPadding, vertical = d.statusCardPaddingV),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // State indicator
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(color)
-            )
-            Text(text = label, style = PttTypography.StatusLabel, color = color)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(d.smallGap)) {
+            Box(Modifier.size(d.dotSize * 0.8f).clip(RoundedCornerShape(d.dotSize * 0.4f)).background(color))
+            Text(text = label, fontSize = d.statusLabelSize, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = color, letterSpacing = androidx.compose.ui.unit.sp(2))
         }
-
-        // Online count
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = "$onlineCount", style = PttTypography.StatNumber, color = TextWhite)
-            Text(text = "ONLINE", style = PttTypography.StatLabel, color = TextSecondary)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(d.smallGap)) {
+            Text(text = "$onlineCount", fontSize = d.statNumberSize, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = TextWhite)
+            Text(text = "ONLINE", fontSize = d.captionSize, color = TextSecondary, letterSpacing = androidx.compose.ui.unit.sp(1))
         }
-
-        // Network
-        Text(
-            text = if (networkOk) "NET OK" else "NET ERR",
-            style = PttTypography.StatLabel,
-            color = if (networkOk) StatusGreen else StatusRed
-        )
+        Text(text = if (networkOk) "NET OK" else "NET ERR", fontSize = d.captionSize, color = if (networkOk) StatusGreen else StatusRed, letterSpacing = androidx.compose.ui.unit.sp(1))
     }
 }

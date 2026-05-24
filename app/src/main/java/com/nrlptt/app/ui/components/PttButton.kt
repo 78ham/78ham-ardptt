@@ -14,9 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import com.nrlptt.app.theme.*
 
 @Composable
@@ -27,6 +26,7 @@ fun PttButton(
     onRelease: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val d = rememberScreenDimens()
     val bgColor = when {
         isTransmitting -> PttActive
         isConnected -> BgElevated
@@ -44,10 +44,8 @@ fun PttButton(
     }
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clip(RoundedCornerShape(4.dp))
+        modifier = modifier.fillMaxWidth().height(d.pttHeight)
+            .clip(RoundedCornerShape(d.cornerRadius))
             .background(bgColor)
             .pointerInput(isConnected) {
                 awaitPointerEventScope {
@@ -61,17 +59,12 @@ fun PttButton(
             },
         contentAlignment = Alignment.Center
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(d.smallGap + 2.dp)) {
             Icon(
                 if (isTransmitting) Icons.Filled.Mic else Icons.Filled.MicOff,
-                contentDescription = null,
-                tint = textColor,
-                modifier = Modifier.size(20.dp)
+                contentDescription = null, tint = textColor, modifier = Modifier.size(d.iconSize)
             )
-            Text(text = label, style = PttTypography.ButtonLabel, color = textColor)
+            Text(text = label, fontSize = d.buttonLabelSize, fontWeight = FontWeight.Bold, color = textColor, letterSpacing = androidx.compose.ui.unit.sp(2))
         }
     }
 }
