@@ -25,7 +25,7 @@ class AudioRecorder(private val context: Context) {
     private var recorder: AudioRecord? = null
     private val running = AtomicBoolean(false)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    var onData: ((ByteArray) -> Unit)? = null
+    var onData: ((ByteArray, Int) -> Unit)? = null  // (buffer, validBytes) — no copy
 
     fun start(): Boolean {
         if (running.get()) return true
@@ -44,7 +44,7 @@ class AudioRecorder(private val context: Context) {
                 while (running.get()) {
                     try {
                         val n = recorder?.read(buf, 0, buf.size) ?: 0
-                        if (n > 0) onData?.invoke(buf.copyOf(n))
+                        if (n > 0) onData?.invoke(buf, n)
                     } catch (_: CancellationException) { break }
                     catch (e: Exception) { Log.e(TAG, "Record err", e) }
                 }

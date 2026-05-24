@@ -24,7 +24,11 @@ class AudioManager(private val context: Context, private val udp: UdpClient) {
     private val g711 = G711Codec()
     private val opus = OpusCodec()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var audioCodec = AudioCodec.OPUS  // default to OPUS
+    private var audioCodec = AudioCodec.OPUS
+
+    // Reusable buffers to avoid GC pressure on hot path
+    private val txSamples = ShortArray(AudioRecorder.SAMPLES)
+    private val rxPcmBuf = ByteBuffer.allocate(4096).order(ByteOrder.LITTLE_ENDIAN)
 
     private val _tx = MutableStateFlow(false)
     val isTransmitting: StateFlow<Boolean> = _tx.asStateFlow()
@@ -42,14 +46,13 @@ class AudioManager(private val context: Context, private val udp: UdpClient) {
     private var rxJob: Job? = null
 
     init {
-        recorder.onData = { pcm ->
-            if (!_tx.value || pcm.size < AudioRecorder.BYTES) return@onData
-            val frame = pcm.copyOf(AudioRecorder.BYTES)
-            val samples = ShortArray(frame.size / 2)
-            ByteBuffer.wrap(frame).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(samples)
+        recorder.onData = { buf, len ->
+            if (!_tx.value || len < AudioRecorder.BYTES) return@onData
+            // Convert PCM bytes to shorts in-place (zero-copy on buffer)
+            ByteBuffer.wrap(buf, 0, len).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(txSamples, 0, len / 2)
             val encoded = when (audioCodec) {
-                AudioCodec.G711 -> g711.encode(samples)
-                AudioCodec.OPUS -> opus.encode(samples) ?: frame
+                AudioCodec.G711 -> g711.encode(txSamples)
+                AudioCodec.OPUS -> opus.encode(txSamples) ?: buf.copyOf(len)
             }
             udp.sendAudio(encoded, audioCodec == AudioCodec.OPUS)
         }
@@ -82,9 +85,10 @@ class AudioManager(private val context: Context, private val udp: UdpClient) {
         _rx.value = true
         lastAudioTime = System.currentTimeMillis()
 
+        // Audio level: simple RMS approximation
         var sum = 0L
-        for (b in data) sum += (b.toInt() and 0xFF)
-        _level.value = (sum.toFloat() / data.size / 255f).coerceIn(0f, 1f)
+        for (i in data.indices step 2) sum += (data[i].toInt() and 0xFF)
+        _level.value = (sum.toFloat() / (data.size / 2) / 255f).coerceIn(0f, 1f)
 
         rxJob?.cancel()
         rxJob = scope.launch {
@@ -96,17 +100,24 @@ class AudioManager(private val context: Context, private val udp: UdpClient) {
 
         val pcm = when (type) {
             Nrl21Protocol.TYPE_VOICE -> {
-                val samples = ShortArray(data.size)
-                for (i in data.indices) samples[i] = g711.decode(data[i].toInt() and 0xFF).toShort()
-                ByteBuffer.allocate(samples.size * 2).order(ByteOrder.LITTLE_ENDIAN)
-                    .apply { asShortBuffer().put(samples) }.array()
+                // G711 decode directly into reusable buffer
+                rxPcmBuf.clear()
+                for (i in data.indices) {
+                    rxPcmBuf.putShort(g711.decode(data[i].toInt() and 0xFF).toShort())
+                }
+                val out = ByteArray(rxPcmBuf.position())
+                rxPcmBuf.flip()
+                rxPcmBuf.get(out)
+                out
             }
             Nrl21Protocol.TYPE_OPUS -> {
-                val decoded = opus.decode(data)
-                if (decoded != null) {
-                    ByteBuffer.allocate(decoded.size * 2).order(ByteOrder.LITTLE_ENDIAN)
-                        .apply { asShortBuffer().put(decoded) }.array()
-                } else data
+                val decoded = opus.decode(data) ?: return
+                rxPcmBuf.clear()
+                for (s in decoded) rxPcmBuf.putShort(s)
+                val out = ByteArray(rxPcmBuf.position())
+                rxPcmBuf.flip()
+                rxPcmBuf.get(out)
+                out
             }
             else -> return
         }

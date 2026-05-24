@@ -7,7 +7,8 @@ import android.media.AudioTrack
 import android.os.Process
 import android.util.Log
 import kotlinx.coroutines.*
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class AudioPlayer(private val context: Context) {
@@ -20,7 +21,8 @@ class AudioPlayer(private val context: Context) {
     private var track: AudioTrack? = null
     private val playing = AtomicBoolean(false)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val queue = ConcurrentLinkedQueue<ByteArray>()
+    private val queue = LinkedBlockingQueue<ByteArray>(MAX_QUEUE)
+    private var playJob: Job? = null
 
     fun start(): Boolean {
         if (playing.get()) return true
@@ -36,43 +38,45 @@ class AudioPlayer(private val context: Context) {
                 .setBufferSizeInBytes(bufSize)
                 .setTransferMode(AudioTrack.MODE_STREAM).build()
             track?.play(); playing.set(true)
-            scope.launch {
-                Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
-                while (playing.get()) {
-                    val d = queue.poll()
-                    if (d != null) track?.write(d, 0, d.size)
-                    else delay(2)
-                }
-            }
+            startPlayLoop()
             true
         } catch (e: Exception) { Log.e(TAG, "Start failed", e); false }
     }
 
-    fun pause() { track?.pause(); playing.set(false) }
+    fun pause() {
+        playing.set(false)
+        playJob?.cancel(); playJob = null
+        track?.pause()
+    }
 
     fun resume() {
+        if (playing.get()) return
         queue.clear()
         track?.play(); playing.set(true)
-        scope.launch {
+        startPlayLoop()
+    }
+
+    private fun startPlayLoop() {
+        playJob?.cancel()
+        playJob = scope.launch {
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
             while (playing.get()) {
-                val d = queue.poll()
+                val d = queue.poll(2, TimeUnit.MILLISECONDS)
                 if (d != null) track?.write(d, 0, d.size)
-                else delay(2)
             }
         }
     }
 
     fun feed(pcm: ByteArray) {
         if (!playing.get()) start()
-        if (queue.size >= MAX_QUEUE) queue.poll()
-        queue.offer(pcm)
+        if (!queue.offer(pcm)) queue.poll(); queue.offer(pcm)
     }
 
     fun setVolume(v: Float) { track?.setVolume(v.coerceIn(0f, 1f)) }
 
     fun stop() {
         playing.set(false)
+        playJob?.cancel(); playJob = null
         track?.stop(); track?.release(); track = null; queue.clear()
     }
 

@@ -46,15 +46,13 @@ fun SettingsScreen(onBack: () -> Unit) {
         autoConn = saved.autoConnect
     }
 
-    @Composable
-    fun fc() = OutlinedTextFieldDefaults.colors(
+    val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = BrandGreen, unfocusedBorderColor = Border,
         focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, cursorColor = BrandGreen
     )
 
     Box(modifier = Modifier.fillMaxSize().background(BgBlack)) {
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth().background(BgDark).padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -64,25 +62,22 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
 
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                // Server
                 Section("SERVER") {
                     OutlinedTextField(server, { server = it }, label = { Text("HOST") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fc())
+                        modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors)
                     OutlinedTextField(port, { port = it.filter { c -> c.isDigit() } }, label = { Text("PORT") },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = fc())
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = fieldColors)
                 }
 
-                // Account
                 Section("ACCOUNT") {
                     OutlinedTextField(user, { user = it }, label = { Text("USERNAME") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fc())
+                        modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors)
                     OutlinedTextField(pass, { pass = it }, label = { Text("PASSWORD") },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(), colors = fc())
+                        visualTransformation = PasswordVisualTransformation(), colors = fieldColors)
                 }
 
-                // Device
                 Section("DEVICE") {
                     if (saved.callsign.isNotEmpty()) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -92,10 +87,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                     OutlinedTextField(ssid, { ssid = it.filter { c -> c.isDigit() } }, label = { Text("SSID") },
                         modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = fc())
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = fieldColors)
                 }
 
-                // Audio
                 Section("AUDIO") {
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -114,7 +108,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                         colors = SliderDefaults.colors(thumbColor = BrandGreen, activeTrackColor = BrandGreen))
                 }
 
-                // PTT
                 Section("PTT") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
@@ -130,14 +123,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
 
-                // Save
                 Button(
                     onClick = {
                         repo.save(UserSettings(
                             serverAddress = server, serverPort = port.toIntOrNull() ?: 60050,
                             username = user, password = pass,
                             callsign = saved.callsign, dmrId = saved.dmrId,
-                            ssid = ssid.toIntOrNull() ?: 78, codec = codec, volume = volume,
+                            ssid = ssid.toIntOrNull() ?: 178, codec = codec, volume = volume,
                             screenOffPtt = screenOff, autoConnect = autoConn
                         ))
                         Toast.makeText(context, "SAVED", Toast.LENGTH_SHORT).show(); onBack()

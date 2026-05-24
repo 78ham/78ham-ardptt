@@ -36,20 +36,17 @@ class PttController(private val context: Context) {
     private var wakeLock: PowerManager.WakeLock? = null
     private var pressTime = 0L
     private var deviceProfile: DeviceKeyProfiles.Profile? = null
+    private val registeredReceivers = mutableListOf<BroadcastReceiver>()
 
     fun init(key: Int, screenOff: Boolean) {
         pttKeyCode = key; screenOffPtt = screenOff
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP, WAKE_TAG)
 
-        // Auto-detect device profile
         deviceProfile = DeviceKeyProfiles.detect()
         val profile = deviceProfile!!
-        if (key == KeyEvent.KEYCODE_VOLUME_UP) {
-            pttKeyCode = profile.pttKeyCode
-        }
-        Log.i(TAG, "Profile: ${profile.name}, PTT key: 0x${pttKeyCode.toString(16)}")
+        if (key == KeyEvent.KEYCODE_VOLUME_UP) pttKeyCode = profile.pttKeyCode
+        Log.i(TAG, "Profile: ${profile.name}, PTT: 0x${pttKeyCode.toString(16)}")
 
-        // Register broadcast receivers for MTK-style PTT
         if (profile.useBroadcastPtt) {
             profile.broadcastActions.forEach { action ->
                 try {
@@ -62,8 +59,8 @@ class PttController(private val context: Context) {
                         }
                     }
                     context.registerReceiver(receiver, IntentFilter(action))
-                    Log.i(TAG, "Registered broadcast: $action")
-                } catch (e: Exception) { Log.e(TAG, "Broadcast register failed: $action", e) }
+                    registeredReceivers.add(receiver)
+                } catch (e: Exception) { Log.e(TAG, "Broadcast failed: $action", e) }
             }
         }
     }
@@ -74,12 +71,10 @@ class PttController(private val context: Context) {
             KeyEvent.ACTION_DOWN -> if (!isPressed) {
                 isPressed = true; pressTime = System.currentTimeMillis()
                 acquireWake(); vibrate(); listener?.onPress()
-                Log.d(TAG, "PTT press: 0x${event.keyCode.toString(16)}")
             }
             KeyEvent.ACTION_UP -> if (isPressed) {
                 if (System.currentTimeMillis() - pressTime >= 1000) listener?.onLongPress()
                 isPressed = false; listener?.onRelease(); releaseWake()
-                Log.d(TAG, "PTT release")
             }
         }
         return true
@@ -89,11 +84,8 @@ class PttController(private val context: Context) {
     fun release() { if (isPressed) { isPressed = false; listener?.onRelease(); releaseWake() } }
 
     private fun isPttKey(k: Int): Boolean {
-        if (k == pttKeyCode) return true
-        if (k == KEYCODE_PTT) return true
-        // Device profile extra keys
+        if (k == pttKeyCode || k == KEYCODE_PTT) return true
         deviceProfile?.extraKeyCodes?.let { if (k in it) return true }
-        // Generic PTT keys
         return k == 113 || k == 368 || k == 270 || k == 531 || k == 532 ||
                 k == KeyEvent.KEYCODE_HEADSETHOOK ||
                 k in KeyEvent.KEYCODE_BUTTON_1..KeyEvent.KEYCODE_BUTTON_12
@@ -110,5 +102,10 @@ class PttController(private val context: Context) {
     private fun acquireWake() { if (screenOffPtt && wakeLock?.isHeld == false) wakeLock?.acquire(30000) }
     private fun releaseWake() { if (wakeLock?.isHeld == true) wakeLock?.release() }
 
-    fun release() { releaseWake(); listener = null }
+    fun release() {
+        releaseWake()
+        registeredReceivers.forEach { try { context.unregisterReceiver(it) } catch (_: Exception) {} }
+        registeredReceivers.clear()
+        listener = null
+    }
 }

@@ -40,6 +40,9 @@ class UdpClient {
 
     var onPacket: ((Nrl21Protocol.Packet) -> Unit)? = null
 
+    // Reusable datagram for sending
+    private val sendPacket = DatagramPacket(ByteArray(0), 0)
+
     fun connect(host: String, port: Int, dmrId: Int, call: String, ssid: Int, devModel: Int): Boolean {
         return try {
             this.host = host; this.port = port; this.dmrId = dmrId
@@ -47,6 +50,8 @@ class UdpClient {
             _state.value = ConnectionState.CONNECTING
             addr = InetAddress.getByName(host)
             socket = DatagramSocket().apply { soTimeout = 5000 }
+            sendPacket.address = addr
+            sendPacket.port = port
             running.set(true); lastPacketTime = System.currentTimeMillis(); reconnects = 0
             startReceive(); startHeartbeat(); startMonitor()
             _state.value = ConnectionState.CONNECTED
@@ -65,8 +70,9 @@ class UdpClient {
 
     fun send(data: ByteArray): Boolean {
         return try {
-            val a = addr ?: return false
-            socket?.send(DatagramPacket(data, data.size, a, port)); true
+            sendPacket.data = data
+            sendPacket.length = data.size
+            socket?.send(sendPacket); true
         } catch (e: Exception) { false }
     }
 
@@ -90,12 +96,13 @@ class UdpClient {
     private fun startReceive() {
         scope.launch {
             val buf = ByteArray(BUFFER)
+            val pkt = DatagramPacket(buf, buf.size)
             while (running.get()) {
                 try {
-                    val pkt = DatagramPacket(buf, buf.size)
                     socket?.receive(pkt)
                     lastPacketTime = System.currentTimeMillis()
-                    Nrl21Protocol.decode(pkt.data.copyOf(pkt.length))?.let { onPacket?.invoke(it) }
+                    val data = buf.copyOf(pkt.length)
+                    Nrl21Protocol.decode(data)?.let { onPacket?.invoke(it) }
                 } catch (_: CancellationException) { break }
                 catch (e: Exception) { if (running.get()) Log.e(TAG, "Recv err", e) }
             }
@@ -106,7 +113,7 @@ class UdpClient {
         scope.launch {
             while (running.get()) {
                 try {
-                    send(Nrl21Protocol.createPacket(Nrl21Protocol.TYPE_HEARTBEAT, callsign, ssid, devModel, dmrId))
+                    send(Nrl21Protocol.createHeartbeat(callsign, ssid, devModel, dmrId))
                     delay(HEARTBEAT_MS)
                 } catch (_: CancellationException) { break }
             }
@@ -116,7 +123,7 @@ class UdpClient {
     private fun startMonitor() {
         scope.launch {
             while (running.get()) {
-                delay(5000)
+                delay(3000)
                 if (System.currentTimeMillis() - lastPacketTime > TIMEOUT_MS) {
                     _state.value = ConnectionState.DISCONNECTED
                     if (reconnects < MAX_RECONNECT) {

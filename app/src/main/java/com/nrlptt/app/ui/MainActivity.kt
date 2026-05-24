@@ -1,7 +1,6 @@
 package com.nrlptt.app.ui
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -19,7 +18,7 @@ import com.nrlptt.app.theme.NrlPttTheme
 
 class MainActivity : ComponentActivity() {
 
-    private var screen = AppScreen.LOGIN
+    private var initialScreen = AppScreen.LOGIN
 
     enum class AppScreen { LOGIN, MAIN, SETTINGS }
 
@@ -32,48 +31,38 @@ class MainActivity : ComponentActivity() {
         }
 
         val settings = SettingsRepository(this).load()
-        screen = if (settings.autoConnect && settings.username.isNotEmpty()) AppScreen.MAIN else AppScreen.LOGIN
+        initialScreen = if (settings.autoConnect && settings.username.isNotEmpty()) AppScreen.MAIN else AppScreen.LOGIN
 
-        // Start PttService
-        Intent(this, PttService::class.java).also { startService(it) }
+        startService(Intent(this, PttService::class.java))
 
-        render()
-    }
-
-    override fun dispatchKeyEvent(event: KeyEvent?): Boolean {
-        val svc = PttService.instance
-        if (svc != null && event != null && svc.handleKey(event)) return true
-        return super.dispatchKeyEvent(event)
-    }
-
-    private fun render() {
         setContent {
             NrlPttTheme {
-                var currentScreen by remember { mutableStateOf(screen) }
+                var screen by remember { mutableStateOf(initialScreen) }
 
-                when (currentScreen) {
+                when (screen) {
                     AppScreen.LOGIN -> LoginScreen(
-                        onLoginSuccess = { currentScreen = AppScreen.MAIN },
-                        onSkip = { currentScreen = AppScreen.MAIN }
+                        onLoginSuccess = { screen = AppScreen.MAIN },
+                        onSkip = { screen = AppScreen.MAIN }
                     )
                     AppScreen.MAIN -> {
                         val svc = PttService.instance
                         if (svc != null) {
                             MainScreen(
                                 service = svc,
-                                onSettings = { currentScreen = AppScreen.SETTINGS },
-                                onLogout = {
-                                    svc.disconnect()
-                                    currentScreen = AppScreen.LOGIN
-                                }
+                                onSettings = { screen = AppScreen.SETTINGS },
+                                onLogout = { svc.disconnect(); screen = AppScreen.LOGIN }
                             )
                         }
                     }
-                    AppScreen.SETTINGS -> SettingsScreen(
-                        onBack = { currentScreen = AppScreen.MAIN }
-                    )
+                    AppScreen.SETTINGS -> SettingsScreen(onBack = { screen = AppScreen.MAIN })
                 }
             }
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent?): Boolean {
+        val svc = PttService.instance
+        if (svc != null && event != null && svc.handleKey(event)) return true
+        return super.dispatchKeyEvent(event)
     }
 }
