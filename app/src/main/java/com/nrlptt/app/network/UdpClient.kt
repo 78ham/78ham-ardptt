@@ -17,7 +17,9 @@ class UdpClient {
         private const val BUFFER = 2048
         private const val HEARTBEAT_MS = 1000L
         private const val TIMEOUT_MS = 6000L
-        private const val MAX_RECONNECT = 5
+        private const val MAX_RECONNECT = 20
+        private const val BASE_DELAY = 2000L
+        private const val MAX_DELAY = 60000L
     }
 
     private var socket: DatagramSocket? = null
@@ -32,6 +34,7 @@ class UdpClient {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var lastPacketTime = 0L
     private var reconnects = 0
+    private var onReconnect: ((Boolean) -> Unit)? = null
 
     var callsign: String = ""
     var ssid: Int = 178
@@ -40,7 +43,6 @@ class UdpClient {
 
     var onPacket: ((Nrl21Protocol.Packet) -> Unit)? = null
 
-    // Reusable datagram for sending
     private val sendPacket = DatagramPacket(ByteArray(0), 0)
 
     fun connect(host: String, port: Int, dmrId: Int, call: String, ssid: Int, devModel: Int): Boolean {
@@ -101,6 +103,7 @@ class UdpClient {
                 try {
                     socket?.receive(pkt)
                     lastPacketTime = System.currentTimeMillis()
+                    if (reconnects > 0) { reconnects = 0; Log.d(TAG, "Connection recovered") }
                     val data = buf.copyOf(pkt.length)
                     Nrl21Protocol.decode(data)?.let { onPacket?.invoke(it) }
                 } catch (_: CancellationException) { break }
@@ -124,12 +127,21 @@ class UdpClient {
         scope.launch {
             while (running.get()) {
                 delay(3000)
+                if (!running.get()) break
                 if (System.currentTimeMillis() - lastPacketTime > TIMEOUT_MS) {
                     _state.value = ConnectionState.DISCONNECTED
                     if (reconnects < MAX_RECONNECT) {
-                        reconnects++; delay(2000)
-                        connect(host, port, dmrId, callsign, ssid, devModel)
-                    } else disconnect()
+                        reconnects++
+                        val delayMs = (BASE_DELAY * (1L shl (reconnects - 1).coerceAtMost(4))).coerceAtMost(MAX_DELAY)
+                        Log.w(TAG, "Timeout, reconnect #$reconnects in ${delayMs}ms")
+                        delay(delayMs)
+                        if (!running.get()) break
+                        val ok = connect(host, port, dmrId, callsign, ssid, devModel)
+                        onReconnect?.invoke(ok)
+                    } else {
+                        Log.e(TAG, "Max reconnects reached")
+                        disconnect()
+                    }
                     break
                 }
             }

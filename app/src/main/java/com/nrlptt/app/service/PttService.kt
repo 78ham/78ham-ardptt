@@ -37,6 +37,7 @@ class PttService : Service() {
     private lateinit var settings: SettingsRepository
     private lateinit var audio: AudioManager
     private lateinit var ptt: PttController
+    private lateinit var locationReporter: LocationReporter
 
     private val _connections = MutableStateFlow<Map<String, ServerConnection>>(emptyMap())
     val connections: StateFlow<Map<String, ServerConnection>> = _connections.asStateFlow()
@@ -57,6 +58,13 @@ class PttService : Service() {
         settings = SettingsRepository(this)
         audio = AudioManager(this)
         ptt = PttController(this)
+        locationReporter = LocationReporter(this).apply {
+            getTargets = { _connections.value.values.filter { it.connState.value == ConnectionState.CONNECTED }.map { it.udp } }
+            getCallsign = { _connections.value.values.firstOrNull()?.userInfo?.callsign ?: "" }
+            getSsid = { _connections.value.values.firstOrNull()?.deviceData?.ssid ?: 178 }
+            getDevModel = { _connections.value.values.firstOrNull()?.deviceData?.devModel ?: 101 }
+            getDmrId = { _connections.value.values.firstOrNull()?.deviceData?.dmrId ?: 178 }
+        }
 
         // Wire audio TX to all connected UdpClients
         audio.getTxTargets = { _connections.value.values.filter { it.connState.value == ConnectionState.CONNECTED }.map { it.udp } }
@@ -86,6 +94,7 @@ class PttService : Service() {
 
         setupPtt()
         createChannel()
+        locationReporter.start()
         instance = this
     }
 
@@ -106,7 +115,7 @@ class PttService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        disconnectAll(); audio.release(); ptt.release(); scope.cancel()
+        disconnectAll(); audio.release(); ptt.release(); locationReporter.release(); scope.cancel()
         isRunning = false; instance = null
     }
 
