@@ -18,8 +18,13 @@ import com.nrlptt.app.ptt.PttController
 import com.nrlptt.app.ui.MainActivity
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 
 class PttService : Service() {
 
@@ -48,6 +53,35 @@ class PttService : Service() {
 
     private val _isReceiving = MutableStateFlow(false)
     val isReceiving: StateFlow<Boolean> = _isReceiving.asStateFlow()
+
+    // Reactive views across all servers — the UI collects these so it recomposes when any
+    // connection's messages / activity / connection-state changes.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val allMessages: StateFlow<List<ServerConnection.MessageEntry>> =
+        _connections.flatMapLatest { conns ->
+            if (conns.isEmpty()) flowOf(emptyList<ServerConnection.MessageEntry>())
+            else combine(conns.values.map { it.messages }) { arr ->
+                arr.flatMap { it }.sortedByDescending { it.time }.take(5)
+            }
+        }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val allActivity: StateFlow<List<ServerConnection.ActivityEntry>> =
+        _connections.flatMapLatest { conns ->
+            if (conns.isEmpty()) flowOf(emptyList<ServerConnection.ActivityEntry>())
+            else combine(conns.values.map { it.activityLog }) { arr ->
+                arr.flatMap { it }.sortedByDescending { it.time }.take(5)
+            }
+        }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val anyConnected: StateFlow<Boolean> =
+        _connections.flatMapLatest { conns ->
+            if (conns.isEmpty()) flowOf(false)
+            else combine(conns.values.map { it.connState }) { states ->
+                states.any { it == ConnectionState.CONNECTED }
+            }
+        }.stateIn(scope, SharingStarted.Eagerly, false)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -93,7 +127,7 @@ class PttService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        disconnectAll(); audio.release(); ptt.release(); locationReporter.release(); scope.cancel()
+        disconnectAll(); audio.release(); ptt.destroy(); locationReporter.release(); scope.cancel()
         isRunning = false; instance = null
     }
 

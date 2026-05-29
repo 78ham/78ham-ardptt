@@ -7,7 +7,7 @@
 ## 功能
 
 - **PTT 对讲** — 按住说话，支持息屏启麦
-- **Opus 语音** — 6kbps 低带宽编码，16kHz 采样
+- **Opus 语音** — 16kHz 采样，~24kbps VBR，VOIP 模式（Concentus 纯 Java 实现）
 - **G711 语音** — 兼容传统 A-law 编码
 - **文本消息** — 接收 Type=5 文本消息（只收不发）
 - **频道切换** — 支持多房间在线切换
@@ -19,7 +19,7 @@
 
 - **语言**: Kotlin
 - **UI**: Jetpack Compose + Material 3
-- **音频**: AudioRecord/AudioTrack + MediaCodec Opus
+- **音频**: AudioRecord/AudioTrack + Concentus Opus (纯 Java libopus)
 - **协议**: NRL21 二进制 UDP 协议
 - **最低 SDK**: Android 6.0 (API 23)
 - **目标 SDK**: Android 13 (API 33)
@@ -32,7 +32,7 @@
 | 服务器 | m.nrlptt.com:60050 |
 | DMR ID | 178 |
 | SSID | 178 |
-| 语音编码 | Opus 6kbps |
+| 语音编码 | Opus 16kHz ~24kbps |
 | 心跳间隔 | 1秒 |
 | 设备型号 | 101 (Android) |
 
@@ -43,7 +43,7 @@ app/src/main/java/com/nrlptt/app/
 ├── NrlPttApp.kt              # Application
 ├── audio/
 │   ├── G711Codec.kt          # G.711 A-law 编解码
-│   ├── OpusCodec.kt          # Opus MediaCodec 编解码 (6kbps)
+│   ├── OpusCodec.kt          # Opus 编解码 (Concentus, 16kHz/~24kbps VOIP)
 │   ├── AudioRecorder.kt      # 麦克风录制 (8kHz/16kHz)
 │   ├── AudioPlayer.kt        # PCM 播放
 │   └── AudioManager.kt       # 音频调度 (TX/RX/编解码)

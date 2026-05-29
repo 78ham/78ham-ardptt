@@ -4,8 +4,6 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,8 +11,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import com.nrlptt.app.R
 import com.nrlptt.app.theme.*
+import androidx.compose.ui.unit.dp
 import kotlin.math.sin
 
 @Composable
@@ -36,7 +37,7 @@ fun SpeakerIndicator(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(d.cardPadding)
     ) {
-        Icon(Icons.Filled.Mic, contentDescription = null, tint = textColor, modifier = Modifier.size(d.iconSize))
+        Icon(painterResource(R.drawable.ic_mic), contentDescription = null, tint = textColor, modifier = Modifier.size(d.iconSize))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = if (isReceiving && callsign.isNotEmpty()) callsign else "---",

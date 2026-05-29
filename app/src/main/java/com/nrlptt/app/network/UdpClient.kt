@@ -46,21 +46,33 @@ class UdpClient {
     private val sendPacket = DatagramPacket(ByteArray(0), 0)
 
     fun connect(host: String, port: Int, dmrId: Int, call: String, ssid: Int, devModel: Int): Boolean {
+        this.host = host; this.port = port; this.dmrId = dmrId
+        this.callsign = call; this.ssid = ssid; this.devModel = devModel
+        _state.value = ConnectionState.CONNECTING
+        if (!openSocket()) { _state.value = ConnectionState.DISCONNECTED; return false }
+        running.set(true); lastPacketTime = System.currentTimeMillis(); reconnects = 0
+        // Loops live for the whole connection; a reconnect only swaps the socket (see startMonitor),
+        // so they must be started exactly once here — never on the reconnect path.
+        startReceive(); startHeartbeat(); startMonitor()
+        _state.value = ConnectionState.CONNECTED
+        Log.d(TAG, "Connected $host:$port")
+        return true
+    }
+
+    /**
+     * (Re)open the UDP socket. Closing the previous socket unblocks any in-flight
+     * receive() so the existing receive loop picks up the new socket next iteration.
+     */
+    private fun openSocket(): Boolean {
         return try {
-            this.host = host; this.port = port; this.dmrId = dmrId
-            this.callsign = call; this.ssid = ssid; this.devModel = devModel
-            _state.value = ConnectionState.CONNECTING
             addr = InetAddress.getByName(host)
+            socket?.close()
             socket = DatagramSocket().apply { soTimeout = 5000 }
             sendPacket.address = addr
             sendPacket.port = port
-            running.set(true); lastPacketTime = System.currentTimeMillis(); reconnects = 0
-            startReceive(); startHeartbeat(); startMonitor()
-            _state.value = ConnectionState.CONNECTED
-            Log.d(TAG, "Connected $host:$port")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Connect failed", e); _state.value = ConnectionState.DISCONNECTED; false
+            Log.e(TAG, "Socket open failed", e); false
         }
     }
 
@@ -136,13 +148,16 @@ class UdpClient {
                         Log.w(TAG, "Timeout, reconnect #$reconnects in ${delayMs}ms")
                         delay(delayMs)
                         if (!running.get()) break
-                        val ok = connect(host, port, dmrId, callsign, ssid, devModel)
+                        // Swap the socket only — keep looping. reconnects resets to 0 in the
+                        // receive loop once a packet actually arrives (true recovery).
+                        val ok = openSocket()
+                        if (ok) { lastPacketTime = System.currentTimeMillis(); _state.value = ConnectionState.CONNECTED }
                         onReconnect?.invoke(ok)
                     } else {
                         Log.e(TAG, "Max reconnects reached")
                         disconnect()
+                        break
                     }
-                    break
                 }
             }
         }

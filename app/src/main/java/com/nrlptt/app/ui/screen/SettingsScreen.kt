@@ -13,13 +13,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import com.nrlptt.app.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.nrlptt.app.data.AudioCodec
@@ -28,6 +29,8 @@ import com.nrlptt.app.data.SettingsRepository
 import com.nrlptt.app.data.UserSettings
 import com.nrlptt.app.network.ApiClient
 import com.nrlptt.app.theme.*
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,7 +93,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             Text("CUSTOM", fontSize = d.captionSize, color = BrandGreen)
                         }
                         TextButton(onClick = { showDiscoverDialog = true }) {
-                            Icon(Icons.Filled.Public, null, tint = BrandGreen, modifier = Modifier.size(d.smallIconSize))
+                            Icon(painterResource(R.drawable.ic_public), null, tint = BrandGreen, modifier = Modifier.size(d.smallIconSize))
                             Spacer(Modifier.width(d.smallGap))
                             Text("DISCOVER", fontSize = d.captionSize, color = BrandGreen)
                         }

@@ -18,6 +18,8 @@ import com.nrlptt.app.network.ConnectionState
 import com.nrlptt.app.service.PttService
 import com.nrlptt.app.ui.components.*
 import com.nrlptt.app.theme.*
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,14 +41,15 @@ fun MainScreen(
     val onlineCount = activeConn?.onlineCount?.collectAsState()?.value ?: 0
     val roomList = activeConn?.roomList?.collectAsState()?.value ?: emptyList()
 
-    val allMessages = connections.values.flatMap { it.messages.value }.sortedByDescending { it.time }.take(5)
-    val allActivity = connections.values.flatMap { it.activityLog.value }.sortedByDescending { it.time }.take(5)
+    val allMessages by service.allMessages.collectAsState()
+    val allActivity by service.allActivity.collectAsState()
 
     var showRoomPicker by remember { mutableStateOf(false) }
     val isConnected = connState == ConnectionState.CONNECTED
 
-    LaunchedEffect(activeConn?.isLoggedIn?.value) {
-        if (activeConn?.isLoggedIn?.value == true) { kotlinx.coroutines.delay(500); activeConn.loadRoomList() }
+    val isLoggedIn = activeConn?.isLoggedIn?.collectAsState()?.value ?: false
+    LaunchedEffect(activeConn, isLoggedIn) {
+        if (isLoggedIn) { kotlinx.coroutines.delay(500); activeConn?.loadRoomList() }
     }
 
     val radioState = remember(isTransmitting, isReceiving, isConnected) {
@@ -135,7 +138,7 @@ fun MainScreen(
                 }
             }
 
-            val anyConnected = connections.values.any { it.connState.value == ConnectionState.CONNECTED }
+            val anyConnected by service.anyConnected.collectAsState()
             PttButton(
                 isConnected = anyConnected, isTransmitting = isTransmitting,
                 onPress = { service.startTx() }, onRelease = { service.stopTx() },

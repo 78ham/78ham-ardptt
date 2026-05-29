@@ -16,6 +16,7 @@ class AudioPlayer(private val context: Context) {
     companion object {
         private const val TAG = "AudioPlayer"
         private const val MAX_QUEUE = 50
+        private const val DEFAULT_RATE = 16000
     }
 
     private var track: AudioTrack? = null
@@ -24,19 +25,26 @@ class AudioPlayer(private val context: Context) {
     private val queue = LinkedBlockingQueue<ByteArray>(MAX_QUEUE)
     private var playJob: Job? = null
 
-    fun start(): Boolean {
-        if (playing.get()) return true
+    @Volatile private var sampleRate = DEFAULT_RATE
+    private var volume = 1f
+
+    fun start(rate: Int = sampleRate): Boolean {
+        if (playing.get() && rate == sampleRate) return true
+        // Rate change while playing → rebuild the track at the new rate.
+        if (playing.get()) stop()
+        sampleRate = rate
         return try {
-            val bufSize = AudioTrack.getMinBufferSize(8000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+            val bufSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
             track = AudioTrack.Builder()
                 .setAudioAttributes(AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
                 .setAudioFormat(AudioFormat.Builder()
-                    .setSampleRate(8000).setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(sampleRate).setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                     .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
                 .setBufferSizeInBytes(bufSize)
                 .setTransferMode(AudioTrack.MODE_STREAM).build()
+            track?.setVolume(volume)
             track?.play(); playing.set(true)
             startPlayLoop()
             true
@@ -67,12 +75,16 @@ class AudioPlayer(private val context: Context) {
         }
     }
 
-    fun feed(pcm: ByteArray) {
-        if (!playing.get()) start()
-        if (!queue.offer(pcm)) queue.poll(); queue.offer(pcm)
+    /** Feed PCM produced at [rate] Hz; (re)opens the track if the rate changed. */
+    fun feed(pcm: ByteArray, rate: Int) {
+        if (!playing.get() || rate != sampleRate) start(rate)
+        if (!queue.offer(pcm)) { queue.poll(); queue.offer(pcm) }
     }
 
-    fun setVolume(v: Float) { track?.setVolume(v.coerceIn(0f, 1f)) }
+    fun setVolume(v: Float) {
+        volume = v.coerceIn(0f, 1f)
+        track?.setVolume(volume)
+    }
 
     fun stop() {
         playing.set(false)

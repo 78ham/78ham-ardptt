@@ -16,30 +16,41 @@ class AudioRecorder(private val context: Context) {
 
     companion object {
         private const val TAG = "AudioRecorder"
-        const val SAMPLE_RATE = 8000
         const val FRAME_MS = 20
-        const val SAMPLES = SAMPLE_RATE * FRAME_MS / 1000
-        const val BYTES = SAMPLES * 2
     }
+
+    // Capture rate / frame size depend on the active codec (G711 = 8k/160, Opus = 16k/320).
+    @Volatile var sampleRate = 8000
+        private set
+    @Volatile var frameSamples = sampleRate * FRAME_MS / 1000
+        private set
+    val frameBytes: Int get() = frameSamples * 2
 
     private var recorder: AudioRecord? = null
     private val running = AtomicBoolean(false)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     var onData: ((ByteArray, Int) -> Unit)? = null  // (buffer, validBytes) — no copy
 
+    /** Set capture format. Must be called while not recording. */
+    fun configure(sampleRate: Int) {
+        this.sampleRate = sampleRate
+        this.frameSamples = sampleRate * FRAME_MS / 1000
+    }
+
     fun start(): Boolean {
         if (running.get()) return true
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED) return false
         return try {
-            val bufSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-                .coerceAtLeast(BYTES * 5)
-            recorder = AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize)
+            val frameBytes = this.frameBytes
+            val bufSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                .coerceAtLeast(frameBytes * 5)
+            recorder = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize)
             if (recorder?.state != AudioRecord.STATE_INITIALIZED) { recorder?.release(); recorder = null; return false }
             running.set(true)
             scope.launch {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
-                val buf = ByteArray(BYTES)
+                val buf = ByteArray(frameBytes)
                 recorder?.startRecording()
                 while (running.get()) {
                     try {

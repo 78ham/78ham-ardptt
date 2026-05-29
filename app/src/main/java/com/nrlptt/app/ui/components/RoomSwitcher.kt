@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import com.nrlptt.app.theme.*
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun RoomSwitcher(

@@ -6,6 +6,8 @@ import com.nrlptt.app.data.AudioCodec
 import com.nrlptt.app.network.Nrl21Protocol
 import com.nrlptt.app.network.UdpClient
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +19,7 @@ class AudioManager(private val context: Context) {
     companion object {
         private const val TAG = "AudioManager"
         private const val RX_TIMEOUT = 3000L
+        private const val G711_RATE = 8000
     }
 
     private val recorder = AudioRecorder(context)
@@ -26,7 +29,8 @@ class AudioManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var audioCodec = AudioCodec.OPUS
 
-    private val txSamples = ShortArray(AudioRecorder.SAMPLES)
+    // Reallocated by setCodec to match the codec frame (G711 = 160 @8k, Opus = 320 @16k).
+    private var txSamples = ShortArray(OpusCodec.FRAME_SIZE)
     private val rxPcmBuf = ByteBuffer.allocate(4096).order(ByteOrder.LITTLE_ENDIAN)
 
     // TX targets — set by PttService
@@ -47,22 +51,53 @@ class AudioManager(private val context: Context) {
     private var lastAudioTime = 0L
     private var rxJob: Job? = null
 
+    // RX packets arrive concurrently from every connected ServerConnection. Funnel them
+    // through one consumer so the single OpusCodec decoder and rxPcmBuf (neither thread-safe)
+    // are only ever touched by one coroutine. Drop oldest on overflow to favour fresh audio.
+    private class RxItem(val data: ByteArray, val type: Int, val callsign: String)
+    private val rxChannel = Channel<RxItem>(capacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
     init {
-        recorder.onData = { buf, len ->
-            if (!_tx.value || len < AudioRecorder.BYTES) return@onData
-            ByteBuffer.wrap(buf, 0, len).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(txSamples, 0, len / 2)
-            val encoded = when (audioCodec) {
-                AudioCodec.G711 -> g711.encode(txSamples)
-                AudioCodec.OPUS -> opus.encode(txSamples) ?: buf.copyOf(len)
-            }
-            val targets = getTxTargets?.invoke() ?: emptyList()
-            for (udp in targets) udp.sendAudio(encoded, audioCodec == AudioCodec.OPUS)
+        // RX can carry Opus from any peer regardless of our TX codec, so the decoder must
+        // always be ready (it was previously only inited in the never-called preparePlayer).
+        opus.initDecoder()
+
+        scope.launch {
+            for (item in rxChannel) processRx(item.data, item.type, item.callsign)
         }
+
+        recorder.onData = { buf, len ->
+            val frame = txSamples
+            if (_tx.value && len >= frame.size * 2) {
+                ByteBuffer.wrap(buf, 0, len).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(frame, 0, frame.size)
+                val encoded = when (audioCodec) {
+                    AudioCodec.G711 -> g711.encode(frame)
+                    AudioCodec.OPUS -> opus.encode(frame)   // raw 16k Opus frame, or null on failure
+                }
+                if (encoded != null) {
+                    val targets = getTxTargets?.invoke() ?: emptyList()
+                    for (udp in targets) udp.sendAudio(encoded, audioCodec == AudioCodec.OPUS)
+                }
+            }
+        }
+
+        // Align recorder rate / tx frame with the default codec (PttService re-applies on connect).
+        setCodec(audioCodec)
     }
 
     fun setCodec(c: AudioCodec) {
         audioCodec = c
-        if (c == AudioCodec.OPUS) opus.initEncoder()
+        when (c) {
+            AudioCodec.G711 -> {
+                recorder.configure(G711_RATE)
+                txSamples = ShortArray(G711_RATE * AudioRecorder.FRAME_MS / 1000)  // 160
+            }
+            AudioCodec.OPUS -> {
+                recorder.configure(OpusCodec.SAMPLE_RATE)
+                txSamples = ShortArray(OpusCodec.FRAME_SIZE)                        // 320
+                opus.initEncoder()
+            }
+        }
     }
 
     fun setVolume(v: Int) { player.setVolume(v / 100f) }
@@ -81,15 +116,18 @@ class AudioManager(private val context: Context) {
         recorder.stop(); _tx.value = false; player.resume()
     }
 
+    /** Called from arbitrary network coroutines — must stay cheap and thread-safe. */
     fun handleRx(data: ByteArray, type: Int, callsign: String) {
+        if (_tx.value) return
+        rxChannel.trySend(RxItem(data, type, callsign))
+    }
+
+    /** Runs only on the single rxChannel consumer coroutine — owns opus/g711/rxPcmBuf. */
+    private fun processRx(data: ByteArray, type: Int, callsign: String) {
         if (_tx.value) return
         _speaker.value = callsign
         _rx.value = true
         lastAudioTime = System.currentTimeMillis()
-
-        var sum = 0L
-        for (i in data.indices step 2) sum += (data[i].toInt() and 0xFF)
-        _level.value = (sum.toFloat() / (data.size / 2) / 255f).coerceIn(0f, 1f)
 
         rxJob?.cancel()
         rxJob = scope.launch {
@@ -99,21 +137,25 @@ class AudioManager(private val context: Context) {
             }
         }
 
-        val pcm = when (type) {
-            Nrl21Protocol.TYPE_VOICE -> {
-                rxPcmBuf.clear()
-                for (i in data.indices) rxPcmBuf.putShort(g711.decode(data[i].toInt() and 0xFF).toShort())
-                val out = ByteArray(rxPcmBuf.position()); rxPcmBuf.flip(); rxPcmBuf.get(out); out
-            }
-            Nrl21Protocol.TYPE_OPUS -> {
-                val decoded = opus.decode(data) ?: return
-                rxPcmBuf.clear()
-                for (s in decoded) rxPcmBuf.putShort(s)
-                val out = ByteArray(rxPcmBuf.position()); rxPcmBuf.flip(); rxPcmBuf.get(out); out
-            }
+        // Decode to PCM (G711 → 8k, Opus → 16k) and compute the level meter from the actual
+        // samples (the encoded Opus/G711 payload bytes carry no usable amplitude info).
+        val (samples, rate) = when (type) {
+            Nrl21Protocol.TYPE_VOICE ->
+                ShortArray(data.size) { g711.decode(data[it].toInt() and 0xFF).toShort() } to G711_RATE
+            Nrl21Protocol.TYPE_OPUS ->
+                (opus.decode(data) ?: return) to OpusCodec.SAMPLE_RATE
             else -> return
         }
-        player.feed(pcm)
+        if (samples.isEmpty()) return
+
+        var sum = 0L
+        for (s in samples) sum += kotlin.math.abs(s.toInt())
+        _level.value = (sum.toFloat() / samples.size / 32768f).coerceIn(0f, 1f)
+
+        rxPcmBuf.clear()
+        for (s in samples) rxPcmBuf.putShort(s)
+        val out = ByteArray(rxPcmBuf.position()); rxPcmBuf.flip(); rxPcmBuf.get(out)
+        player.feed(out, rate)
     }
 
     fun release() {

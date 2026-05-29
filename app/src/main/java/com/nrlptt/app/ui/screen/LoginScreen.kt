@@ -17,6 +17,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.nrlptt.app.data.ServerConfig
 import com.nrlptt.app.data.SettingsRepository
 import com.nrlptt.app.theme.*
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 @Composable

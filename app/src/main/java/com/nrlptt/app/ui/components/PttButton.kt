@@ -5,9 +5,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,8 +12,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import com.nrlptt.app.R
 import com.nrlptt.app.theme.*
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun PttButton(
@@ -61,7 +62,7 @@ fun PttButton(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(d.smallGap + 2.dp)) {
             Icon(
-                if (isTransmitting) Icons.Filled.Mic else Icons.Filled.MicOff,
+                painterResource(if (isTransmitting) R.drawable.ic_mic else R.drawable.ic_mic_off),
                 contentDescription = null, tint = textColor, modifier = Modifier.size(d.iconSize)
             )
             Text(text = label, fontSize = d.buttonLabelSize, fontWeight = FontWeight.Bold, color = textColor, letterSpacing = androidx.compose.ui.unit.sp(2))

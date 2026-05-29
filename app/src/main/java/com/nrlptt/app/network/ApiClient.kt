@@ -37,7 +37,7 @@ class ApiSession {
     suspend fun login(host: String, user: String, pass: String): Result<UserInfo> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val resp = post("$baseUrl(host)/user/login", mapOf("username" to user, "password" to pass))
+                val resp = post("${baseUrl(host)}/user/login", mapOf("username" to user, "password" to pass))
                 val map = gson.fromJson<Map<String, Any>>(resp, mapType)
                 val code = code(map)
                 if (code != 20000 && code != 60204) throw Exception(msg(map))
@@ -49,7 +49,7 @@ class ApiSession {
 
     suspend fun getUserInfo(host: String): Result<UserInfo> = withContext(Dispatchers.IO) {
         runCatching {
-            val map = postParsed("$baseUrl(host)/user/info", emptyMap<String, Any>())
+            val map = postParsed("${baseUrl(host)}/user/info", emptyMap<String, Any>())
             val d = dataMap(map) ?: throw Exception("empty")
             UserInfo(
                 id = int(d, "id"), username = str(d, "username"), callsign = str(d, "callsign"),
@@ -61,7 +61,7 @@ class ApiSession {
 
     suspend fun getRoomList(host: String): Result<List<RoomInfo>> = withContext(Dispatchers.IO) {
         runCatching {
-            val map = postParsed("$baseUrl(host)/group/list/mini", emptyMap<String, Any>())
+            val map = postParsed("${baseUrl(host)}/group/list/mini", emptyMap<String, Any>())
             @Suppress("UNCHECKED_CAST")
             val list = map["data"] as? List<Map<String, Any>> ?: emptyList()
             list.map { RoomInfo(int(it, "id"), str(it, "name"), int(it, "member_count")) }
@@ -71,7 +71,7 @@ class ApiSession {
     suspend fun getDevice(host: String, callsign: String, ssid: Int): Result<DeviceData> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val map = postParsed("$baseUrl(host)/device/get", mapOf("callsign" to callsign, "ssid" to ssid))
+                val map = postParsed("${baseUrl(host)}/device/get", mapOf("callsign" to callsign, "ssid" to ssid))
                 val d = dataMap(map) ?: throw Exception("empty")
                 DeviceData(
                     id = int(d, "id"), callsign = str(d, "callsign"), ssid = int(d, "ssid"),
@@ -89,7 +89,7 @@ class ApiSession {
                     "dmr_id" to device.dmrId, "group_id" to newGroup, "is_online" to device.isOnline,
                     "dev_model" to device.devModel
                 )
-                val map = postParsed("$baseUrl(host)/device/update", body)
+                val map = postParsed("${baseUrl(host)}/device/update", body)
                 if (code(map) != 20000) throw Exception(msg(map))
                 true
             }
@@ -97,7 +97,7 @@ class ApiSession {
 
     suspend fun getGroup(host: String, groupId: Int): Result<GroupInfo> = withContext(Dispatchers.IO) {
         runCatching {
-            val map = postParsed("$baseUrl(host)/group/get", mapOf("group_id" to groupId))
+            val map = postParsed("${baseUrl(host)}/group/get", mapOf("group_id" to groupId))
             val d = dataMap(map) ?: throw Exception("empty")
             @Suppress("UNCHECKED_CAST")
             val devmap = d["devmap"] as? List<Map<String, Any>> ?: emptyList()

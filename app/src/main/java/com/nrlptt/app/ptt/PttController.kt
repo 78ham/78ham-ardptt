@@ -102,7 +102,7 @@ class PttController(private val context: Context) {
     private fun acquireWake() { if (screenOffPtt && wakeLock?.isHeld == false) wakeLock?.acquire(30000) }
     private fun releaseWake() { if (wakeLock?.isHeld == true) wakeLock?.release() }
 
-    fun release() {
+    fun destroy() {
         releaseWake()
         registeredReceivers.forEach { try { context.unregisterReceiver(it) } catch (_: Exception) {} }
         registeredReceivers.clear()

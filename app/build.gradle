@@ -47,7 +47,12 @@ dependencies {
     implementation 'androidx.compose.ui:ui-graphics'
     implementation 'androidx.compose.ui:ui-tooling-preview'
     implementation 'androidx.compose.material3:material3'
-    implementation 'androidx.compose.material:material-icons-extended'
+    // material-icons-core (transitive via material3) covers the icons we use; the ~10MB
+    // material-icons-extended artifact was dropped — Mic/MicOff/Public moved to vector drawables.
 
     implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Pure-Java Opus codec (libopus port). Produces raw 16kHz/mono/20ms VOIP Opus frames
+    // matching the NRLLink wire format — no NDK, works on low-end MTK/D12 handhelds.
+    implementation 'io.github.jaredmdobson:concentus:1.0.2'
 }

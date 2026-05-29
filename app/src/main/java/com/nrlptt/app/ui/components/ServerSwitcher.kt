@@ -12,6 +12,7 @@ import androidx.compose.ui.draw.clip
 import com.nrlptt.app.network.ConnectionState
 import com.nrlptt.app.network.ServerConnection
 import com.nrlptt.app.theme.*
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun ServerSwitcher(
