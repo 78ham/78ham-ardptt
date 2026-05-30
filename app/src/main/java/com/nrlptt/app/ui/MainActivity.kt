@@ -34,7 +34,11 @@ class MainActivity : ComponentActivity() {
         val servers = SettingsRepository(this).loadServers()
         initialScreen = if (servers.any { it.autoConnect && it.username.isNotEmpty() }) AppScreen.MAIN else AppScreen.LOGIN
 
-        startService(Intent(this, PttService::class.java))
+        // Must use startForegroundService on O+; plain startService is blocked for a
+        // foreground (microphone) service — on HyperOS it silently never starts.
+        val svcIntent = Intent(this, PttService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(svcIntent)
+        else startService(svcIntent)
 
         setContent {
             NrlPttTheme {

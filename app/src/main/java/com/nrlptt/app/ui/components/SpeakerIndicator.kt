@@ -40,7 +40,7 @@ fun SpeakerIndicator(
         Icon(painterResource(R.drawable.ic_mic), contentDescription = null, tint = textColor, modifier = Modifier.size(d.iconSize))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = if (isReceiving && callsign.isNotEmpty()) callsign else "---",
+                text = if (isReceiving && callsign.isNotEmpty()) callsign else "无信号",
                 fontSize = d.speakerNameSize, fontWeight = FontWeight.Bold, color = textColor
             )
             AudioWaveform(isActive = isReceiving, level = audioLevel, height = d.waveformHeight, barWidth = d.waveformBarWidth)

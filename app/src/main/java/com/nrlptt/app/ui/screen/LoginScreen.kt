@@ -44,8 +44,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSkip: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(d.cardPadding * 4))
-            Text("NRL PTT", fontSize = d.statusValueSize, fontWeight = FontWeight.Bold, color = BrandGreen, letterSpacing = androidx.compose.ui.unit.sp(1))
-            Text("PUBLIC NETWORK RADIO", fontSize = d.captionSize, color = TextSecondary, letterSpacing = androidx.compose.ui.unit.sp(1))
+            Text("NRL PTT", fontSize = d.statusValueSize, fontWeight = FontWeight.Bold, color = BrandGreen, letterSpacing = 1.sp)
+            Text("公网对讲", fontSize = d.captionSize, color = TextSecondary, letterSpacing = 1.sp)
             Spacer(Modifier.height(gap * 2))
 
             val fc = OutlinedTextFieldDefaults.colors(
@@ -54,17 +54,17 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSkip: () -> Unit) {
                 cursorColor = BrandGreen, focusedLabelColor = BrandGreen
             )
 
-            OutlinedTextField(server, { server = it }, label = { Text("SERVER") },
+            OutlinedTextField(server, { server = it }, label = { Text("服务器") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fc)
             Spacer(Modifier.height(gap))
-            OutlinedTextField(port, { port = it.filter { c -> c.isDigit() } }, label = { Text("PORT") },
+            OutlinedTextField(port, { port = it.filter { c -> c.isDigit() } }, label = { Text("端口") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = fc)
             Spacer(Modifier.height(gap))
-            OutlinedTextField(user, { user = it }, label = { Text("USERNAME") },
+            OutlinedTextField(user, { user = it }, label = { Text("用户名") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fc)
             Spacer(Modifier.height(gap))
-            OutlinedTextField(pass, { pass = it }, label = { Text("PASSWORD") },
+            OutlinedTextField(pass, { pass = it }, label = { Text("密码") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), colors = fc)
@@ -78,7 +78,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSkip: () -> Unit) {
 
             Button(
                 onClick = {
-                    if (user.isEmpty() || pass.isEmpty()) { error = "REQUIRED"; return@Button }
+                    if (user.isEmpty() || pass.isEmpty()) { error = "请填写完整"; return@Button }
                     loading = true; error = ""
                     scope.launch {
                         repo.addServer(ServerConfig(server, port.toIntOrNull() ?: 60050, user, pass, true))
@@ -91,17 +91,17 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSkip: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = BrandGreen, contentColor = BgBlack)
             ) {
                 if (loading) CircularProgressIndicator(Modifier.size(d.iconSize - 2.dp), color = BgBlack, strokeWidth = 2.dp)
-                else Text("LOGIN", fontSize = d.buttonLabelSize, fontWeight = FontWeight.Bold, letterSpacing = androidx.compose.ui.unit.sp(2))
+                else Text("登录", fontSize = d.buttonLabelSize, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             }
 
             Spacer(Modifier.height(gap))
             TextButton(onClick = onSkip) {
-                Text("SKIP", fontSize = d.captionSize, color = TextDim)
+                Text("跳过", fontSize = d.captionSize, color = TextDim)
             }
 
             if (servers.isNotEmpty()) {
                 Spacer(Modifier.height(gap * 1.5f))
-                Text("SAVED SERVERS", fontSize = d.captionSize, color = TextSecondary, letterSpacing = androidx.compose.ui.unit.sp(1))
+                Text("已保存的服务器", fontSize = d.captionSize, color = TextSecondary, letterSpacing = 1.sp)
                 servers.forEach { cfg ->
                     Text("${cfg.displayLabel} (${cfg.host})", fontSize = d.captionSize, color = TextDim)
                 }

@@ -1,9 +1,9 @@
 package com.nrlptt.app.audio
 
 import android.util.Log
-import org.concentus.OpusApplication
-import org.concentus.OpusDecoder
-import org.concentus.OpusEncoder
+import io.github.jaredmdobson.concentus.OpusApplication
+import io.github.jaredmdobson.concentus.OpusDecoder
+import io.github.jaredmdobson.concentus.OpusEncoder
 
 /**
  * Opus codec backed by Concentus (pure-Java libopus port).

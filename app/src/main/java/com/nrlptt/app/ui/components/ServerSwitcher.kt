@@ -23,7 +23,7 @@ fun ServerSwitcher(
 ) {
     val d = rememberScreenDimens()
     if (connections.isEmpty()) {
-        Text("NO SERVERS", fontSize = d.captionSize, color = TextDim,
+        Text("无服务器", fontSize = d.captionSize, color = TextDim,
             modifier = modifier.padding(horizontal = d.cardPadding, vertical = d.smallGap + 1.dp))
         return
     }

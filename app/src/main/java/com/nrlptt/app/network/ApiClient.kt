@@ -107,6 +107,7 @@ class ApiSession {
     }
 
     private fun postParsed(url: String, body: Any): Map<String, Any> = gson.fromJson(post(url, body), mapType)
+    private fun getParsed(url: String): Map<String, Any> = gson.fromJson(get(url), mapType)
 
     private fun dataMap(map: Map<String, Any>): Map<String, Any>? {
         if (code(map) != 20000) throw Exception(msg(map))
@@ -131,6 +132,22 @@ class ApiSession {
         return text
     }
 
+    private fun get(url: String): String {
+        val conn = URL(url).openConnection() as HttpURLConnection
+        conn.apply {
+            requestMethod = "GET"; connectTimeout = 15000; readTimeout = 15000
+            setRequestProperty("User-Agent", "NrlPtt/1.0")
+            setRequestProperty("Connection", "keep-alive")
+            if (token.isNotEmpty()) setRequestProperty("x-token", token)
+        }
+        val code = conn.responseCode
+        val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
+            ?.bufferedReader()?.use { it.readText() } ?: ""
+        if (code !in 200..299) throw Exception("HTTP $code")
+        return text
+    }
+
+    // NRLLink HTTP endpoints are registered at the root path (gin r.Group("/")), no /api prefix.
     private fun baseUrl(host: String) = if (host.startsWith("http")) host else "https://$host"
     private fun code(m: Map<String, Any>) = (m["code"] as? Number)?.toInt() ?: 0
     private fun msg(m: Map<String, Any>) = m["message"] as? String ?: "error"

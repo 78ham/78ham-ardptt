@@ -111,7 +111,7 @@ class PttService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIF_ID, notification("Standby"))
+        startForeground(NOTIF_ID, notification("待机"))
         isRunning = true
         val servers = settings.loadServers()
         for (cfg in servers) {
@@ -174,7 +174,7 @@ class PttService : Service() {
 
         val ok = conn.login(config.username, config.password)
         if (ok) {
-            updateNotification("${_connections.value.size} servers connected")
+            updateNotification("已连接 ${_connections.value.size} 个服务器")
         }
         ok
     }

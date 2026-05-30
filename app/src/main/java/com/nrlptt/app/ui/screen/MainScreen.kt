@@ -83,7 +83,7 @@ fun MainScreen(
                     title = {},
                     actions = {
                         IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, contentDescription = null, tint = TextSecondary) }
-                        TextButton(onClick = onLogout) { Text("EXIT", fontSize = d.captionSize, color = TextDim) }
+                        TextButton(onClick = onLogout) { Text("退出", fontSize = d.captionSize, color = TextDim) }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BgDark)
                 )
@@ -111,7 +111,7 @@ fun MainScreen(
                     ) {
                         Text(msg.serverId.substringBefore(":"), fontSize = d.captionSize, color = TextDim,
                             modifier = Modifier.width(d.cardPadding * 4), maxLines = 1)
-                        Text("MSG", fontSize = d.captionSize, color = StatusBlue)
+                        Text("消息", fontSize = d.captionSize, color = StatusBlue)
                         Text("${msg.callsign}-${msg.ssid}", fontSize = d.listItemBoldSize, fontWeight = FontWeight.Bold, color = StatusBlue)
                         Text(msg.text, fontSize = d.listItemSize, color = TextPrimary,
                             modifier = Modifier.weight(1f), maxLines = 1)

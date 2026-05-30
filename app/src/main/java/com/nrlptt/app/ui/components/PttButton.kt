@@ -39,9 +39,9 @@ fun PttButton(
         else -> TextDim
     }
     val label = when {
-        isTransmitting -> "TRANSMITTING"
-        isConnected -> "HOLD TO TALK"
-        else -> "OFFLINE"
+        isTransmitting -> "发射中"
+        isConnected -> "按住说话"
+        else -> "未连接"
     }
 
     Box(
@@ -65,7 +65,7 @@ fun PttButton(
                 painterResource(if (isTransmitting) R.drawable.ic_mic else R.drawable.ic_mic_off),
                 contentDescription = null, tint = textColor, modifier = Modifier.size(d.iconSize)
             )
-            Text(text = label, fontSize = d.buttonLabelSize, fontWeight = FontWeight.Bold, color = textColor, letterSpacing = androidx.compose.ui.unit.sp(2))
+            Text(text = label, fontSize = d.buttonLabelSize, fontWeight = FontWeight.Bold, color = textColor, letterSpacing = 2.sp)
         }
     }
 }

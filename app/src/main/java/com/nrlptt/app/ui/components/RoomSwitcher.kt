@@ -34,12 +34,12 @@ fun RoomSwitcher(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = roomName.ifEmpty { "SELECT CHANNEL" },
+                text = roomName.ifEmpty { "选择频道" },
                 fontSize = d.roomNameSize, fontWeight = FontWeight.Bold,
                 color = TextWhite, maxLines = 1
             )
             Text(
-                text = "ID:$roomId  ON:$onlineCount",
+                text = "ID:$roomId  在线:$onlineCount",
                 fontSize = d.captionSize, color = TextSecondary
             )
         }

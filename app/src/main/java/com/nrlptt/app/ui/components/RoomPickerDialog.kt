@@ -30,7 +30,7 @@ fun RoomPickerDialog(
         onDismissRequest = onDismiss,
         containerColor = BgCard,
         titleContentColor = TextWhite,
-        title = { Text("SELECT CHANNEL", fontSize = d.statusLabelSize, fontWeight = FontWeight.Bold, letterSpacing = androidx.compose.ui.unit.sp(2)) },
+        title = { Text("选择频道", fontSize = d.statusLabelSize, fontWeight = FontWeight.Bold, letterSpacing = 2.sp) },
         text = {
             LazyColumn {
                 itemsIndexed(rooms) { i, room ->
@@ -48,9 +48,9 @@ fun RoomPickerDialog(
                             Text(room.name, fontSize = d.listItemBoldSize,
                                 fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
                                 color = if (sel) BrandGreen else TextPrimary)
-                            Text("ID:${room.id}  N:${room.memberCount}", fontSize = d.captionSize, color = TextSecondary)
+                            Text("ID:${room.id}  人数:${room.memberCount}", fontSize = d.captionSize, color = TextSecondary)
                         }
-                        if (sel) Text("●", color = BrandGreen, fontSize = d.statusLabelSize + androidx.compose.ui.unit.sp(2))
+                        if (sel) Text("●", color = BrandGreen, fontSize = (d.statusLabelSize.value + 2).sp)
                     }
                     if (i < rooms.size - 1) HorizontalDivider(color = Border, thickness = 0.5.dp)
                 }
@@ -58,7 +58,7 @@ fun RoomPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("CLOSE", fontSize = d.captionSize, color = TextSecondary)
+                Text("关闭", fontSize = d.captionSize, color = TextSecondary)
             }
         }
     )

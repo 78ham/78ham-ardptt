@@ -23,10 +23,10 @@ fun StatusCard(
 ) {
     val d = rememberScreenDimens()
     val (label, color) = when (state) {
-        RadioState.STANDBY -> "STANDBY" to StatusGray
-        RadioState.TRANSMITTING -> "TX" to StatusOrange
-        RadioState.RECEIVING -> "RX" to StatusGreen
-        RadioState.ERROR -> "ERR" to StatusRed
+        RadioState.STANDBY -> "待机" to StatusGray
+        RadioState.TRANSMITTING -> "发射" to StatusOrange
+        RadioState.RECEIVING -> "接收" to StatusGreen
+        RadioState.ERROR -> "故障" to StatusRed
     }
 
     Row(
@@ -39,12 +39,12 @@ fun StatusCard(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(d.smallGap)) {
             Box(Modifier.size(d.dotSize * 0.8f).clip(RoundedCornerShape(d.dotSize * 0.4f)).background(color))
-            Text(text = label, fontSize = d.statusLabelSize, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = color, letterSpacing = androidx.compose.ui.unit.sp(2))
+            Text(text = label, fontSize = d.statusLabelSize, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = color, letterSpacing = 2.sp)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(d.smallGap)) {
             Text(text = "$onlineCount", fontSize = d.statNumberSize, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = TextWhite)
-            Text(text = "ONLINE", fontSize = d.captionSize, color = TextSecondary, letterSpacing = androidx.compose.ui.unit.sp(1))
+            Text(text = "在线", fontSize = d.captionSize, color = TextSecondary, letterSpacing = 1.sp)
         }
-        Text(text = if (networkOk) "NET OK" else "NET ERR", fontSize = d.captionSize, color = if (networkOk) StatusGreen else StatusRed, letterSpacing = androidx.compose.ui.unit.sp(1))
+        Text(text = if (networkOk) "网络正常" else "网络异常", fontSize = d.captionSize, color = if (networkOk) StatusGreen else StatusRed, letterSpacing = 1.sp)
     }
 }
