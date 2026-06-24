@@ -29,9 +29,9 @@ class AudioPlayer(private val context: Context) {
     private var volume = 1f
 
     fun start(rate: Int = sampleRate): Boolean {
-        if (playing.get() && rate == sampleRate) return true
+        if (playing.get() && rate == sampleRate && track != null) return true
         // Rate change while playing → rebuild the track at the new rate.
-        if (playing.get()) stop()
+        if (track != null) stop()
         sampleRate = rate
         return try {
             val bufSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
@@ -60,7 +60,8 @@ class AudioPlayer(private val context: Context) {
     fun resume() {
         if (playing.get()) return
         queue.clear()
-        track?.play(); playing.set(true)
+        val activeTrack = track ?: return
+        activeTrack.play(); playing.set(true)
         startPlayLoop()
     }
 
@@ -77,7 +78,7 @@ class AudioPlayer(private val context: Context) {
 
     /** Feed PCM produced at [rate] Hz; (re)opens the track if the rate changed. */
     fun feed(pcm: ByteArray, rate: Int) {
-        if (!playing.get() || rate != sampleRate) start(rate)
+        if ((!playing.get() || rate != sampleRate || track == null) && !start(rate)) return
         if (!queue.offer(pcm)) { queue.poll(); queue.offer(pcm) }
     }
 

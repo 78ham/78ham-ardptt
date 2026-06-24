@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 
 class PttService : Service() {
 
@@ -44,6 +45,8 @@ class PttService : Service() {
 
     private val _connections = MutableStateFlow<Map<String, ServerConnection>>(emptyMap())
     val connections: StateFlow<Map<String, ServerConnection>> = _connections.asStateFlow()
+    private val loginJobs = mutableMapOf<String, Deferred<Boolean>>()
+    private val loginJobsLock = Any()
 
     private val _activeServerId = MutableStateFlow("")
     val activeServerId: StateFlow<String> = _activeServerId.asStateFlow()
@@ -61,7 +64,7 @@ class PttService : Service() {
         _connections.flatMapLatest { conns ->
             if (conns.isEmpty()) flowOf(emptyList<ServerConnection.MessageEntry>())
             else combine(conns.values.map { it.messages }) { arr ->
-                arr.flatMap { it }.sortedByDescending { it.time }.take(5)
+                arr.flatMap { it }.sortedByDescending { it.timestamp }.take(5)
             }
         }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
@@ -70,7 +73,7 @@ class PttService : Service() {
         _connections.flatMapLatest { conns ->
             if (conns.isEmpty()) flowOf(emptyList<ServerConnection.ActivityEntry>())
             else combine(conns.values.map { it.activityLog }) { arr ->
-                arr.flatMap { it }.sortedByDescending { it.time }.take(5)
+                arr.flatMap { it }.sortedByDescending { it.timestamp }.take(5)
             }
         }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
@@ -150,7 +153,24 @@ class PttService : Service() {
         }
     }
 
-    suspend fun loginAndConnect(config: ServerConfig): Boolean = withContext(Dispatchers.IO) {
+    suspend fun loginAndConnect(config: ServerConfig): Boolean {
+        val current = _connections.value[config.id]
+        if (current != null && current.isLoggedIn.value) return true
+
+        val job = synchronized(loginJobsLock) {
+            loginJobs[config.id] ?: scope.async { loginAndConnectInternal(config) }
+                .also { loginJobs[config.id] = it }
+        }
+        return try {
+            job.await()
+        } finally {
+            synchronized(loginJobsLock) {
+                if (loginJobs[config.id] == job) loginJobs.remove(config.id)
+            }
+        }
+    }
+
+    private suspend fun loginAndConnectInternal(config: ServerConfig): Boolean = withContext(Dispatchers.IO) {
         val existing = _connections.value[config.id]
         if (existing != null && existing.isLoggedIn.value) return@withContext true
 
@@ -166,7 +186,7 @@ class PttService : Service() {
                 }
             }
         }
-        _connections.value = _connections.value + (config.id to conn)
+        _connections.update { it + (config.id to conn) }
         if (_activeServerId.value.isEmpty()) _activeServerId.value = config.id
 
         val s = settings.load()
@@ -180,16 +200,21 @@ class PttService : Service() {
     }
 
     fun disconnectServer(id: String) {
+        synchronized(loginJobsLock) { loginJobs.remove(id) }?.cancel()
         _connections.value[id]?.disconnect()
-        _connections.value = _connections.value - id
+        _connections.update { it - id }
         if (_activeServerId.value == id) {
             _activeServerId.value = _connections.value.keys.firstOrNull() ?: ""
         }
     }
 
     fun disconnectAll() {
+        val pendingLogins = synchronized(loginJobsLock) {
+            loginJobs.values.toList().also { loginJobs.clear() }
+        }
+        pendingLogins.forEach { it.cancel() }
         _connections.value.values.forEach { it.disconnect() }
-        _connections.value = emptyMap()
+        _connections.update { emptyMap() }
         _activeServerId.value = ""
     }
 

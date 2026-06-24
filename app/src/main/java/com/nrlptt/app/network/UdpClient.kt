@@ -32,9 +32,11 @@ class UdpClient {
 
     private val running = AtomicBoolean(false)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var lastPacketTime = 0L
-    private var reconnects = 0
-    private var onReconnect: ((Boolean) -> Unit)? = null
+    @Volatile private var lastPacketTime = 0L
+    @Volatile private var reconnects = 0
+    private var receiveJob: Job? = null
+    private var heartbeatJob: Job? = null
+    private var monitorJob: Job? = null
 
     var callsign: String = ""
     var ssid: Int = 178
@@ -43,9 +45,8 @@ class UdpClient {
 
     var onPacket: ((Nrl21Protocol.Packet) -> Unit)? = null
 
-    private val sendPacket = DatagramPacket(ByteArray(0), 0)
-
     fun connect(host: String, port: Int, dmrId: Int, call: String, ssid: Int, devModel: Int): Boolean {
+        if (running.get()) disconnect()
         this.host = host; this.port = port; this.dmrId = dmrId
         this.callsign = call; this.ssid = ssid; this.devModel = devModel
         _state.value = ConnectionState.CONNECTING
@@ -68,8 +69,6 @@ class UdpClient {
             addr = InetAddress.getByName(host)
             socket?.close()
             socket = DatagramSocket().apply { soTimeout = 5000 }
-            sendPacket.address = addr
-            sendPacket.port = port
             true
         } catch (e: Exception) {
             Log.e(TAG, "Socket open failed", e); false
@@ -78,15 +77,20 @@ class UdpClient {
 
     fun disconnect() {
         running.set(false)
+        receiveJob?.cancel(); receiveJob = null
+        heartbeatJob?.cancel(); heartbeatJob = null
+        monitorJob?.cancel(); monitorJob = null
         socket?.close(); socket = null
         _state.value = ConnectionState.DISCONNECTED
     }
 
     fun send(data: ByteArray): Boolean {
+        val targetSocket = socket ?: return false
+        val targetAddr = addr ?: return false
+        val targetPort = port
         return try {
-            sendPacket.data = data
-            sendPacket.length = data.size
-            socket?.send(sendPacket); true
+            targetSocket.send(DatagramPacket(data, data.size, targetAddr, targetPort))
+            true
         } catch (e: Exception) { false }
     }
 
@@ -108,12 +112,15 @@ class UdpClient {
     }
 
     private fun startReceive() {
-        scope.launch {
+        receiveJob?.cancel()
+        receiveJob = scope.launch {
             val buf = ByteArray(BUFFER)
             val pkt = DatagramPacket(buf, buf.size)
             while (running.get()) {
                 try {
-                    socket?.receive(pkt)
+                    pkt.length = buf.size
+                    val activeSocket = socket ?: continue
+                    activeSocket.receive(pkt)
                     lastPacketTime = System.currentTimeMillis()
                     if (reconnects > 0) { reconnects = 0; Log.d(TAG, "Connection recovered") }
                     val data = buf.copyOf(pkt.length)
@@ -125,7 +132,8 @@ class UdpClient {
     }
 
     private fun startHeartbeat() {
-        scope.launch {
+        heartbeatJob?.cancel()
+        heartbeatJob = scope.launch {
             while (running.get()) {
                 try {
                     send(Nrl21Protocol.createHeartbeat(callsign, ssid, devModel, dmrId))
@@ -136,7 +144,8 @@ class UdpClient {
     }
 
     private fun startMonitor() {
-        scope.launch {
+        monitorJob?.cancel()
+        monitorJob = scope.launch {
             while (running.get()) {
                 delay(3000)
                 if (!running.get()) break
@@ -152,7 +161,6 @@ class UdpClient {
                         // receive loop once a packet actually arrives (true recovery).
                         val ok = openSocket()
                         if (ok) { lastPacketTime = System.currentTimeMillis(); _state.value = ConnectionState.CONNECTED }
-                        onReconnect?.invoke(ok)
                     } else {
                         Log.e(TAG, "Max reconnects reached")
                         disconnect()

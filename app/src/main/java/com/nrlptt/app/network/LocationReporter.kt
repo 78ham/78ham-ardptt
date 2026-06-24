@@ -61,13 +61,6 @@ class LocationReporter(private val context: Context) {
 
         // Create [loc]lat,lng text packet
         val locText = "${location.latitude},${location.longitude}"
-        val content = "[loc]$locText"
-        val data = ByteArray(6 + content.length)
-        val prefix = "[loc]".toByteArray(Charsets.UTF_8)
-        val body = locText.toByteArray(Charsets.UTF_8)
-        System.arraycopy(prefix, 0, data, 0, prefix.size)
-        System.arraycopy(body, 0, data, prefix.size, body.size)
-
         val packet = Nrl21Protocol.createPacket(
             Nrl21Protocol.TYPE_TEXT, callsign, ssid, devModel, dmrId,
             "[loc]$locText".toByteArray(Charsets.UTF_8)

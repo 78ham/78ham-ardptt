@@ -103,7 +103,7 @@ fun MainScreen(
                     .clip(RoundedCornerShape(d.cornerRadius)).background(BgCard),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                items(allMessages, key = { "msg-${it.serverId}-${it.time}-${it.callsign}" }) { msg ->
+                items(allMessages, key = { "msg-${it.serverId}-${it.timestamp}-${it.callsign}" }) { msg ->
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = d.listItemPaddingH, vertical = d.listItemPaddingV),
                         verticalAlignment = Alignment.CenterVertically,
@@ -118,7 +118,7 @@ fun MainScreen(
                         Text(msg.time, fontSize = d.captionSize, color = TextDim)
                     }
                 }
-                items(allActivity, key = { "act-${it.serverId}-${it.time}-${it.type}" }) { entry ->
+                items(allActivity, key = { "act-${it.serverId}-${it.timestamp}-${it.type}" }) { entry ->
                     val color = when (entry.type) {
                         "TX" -> StatusOrange; "RX" -> StatusGreen; "MSG" -> StatusBlue
                         else -> TextSecondary
